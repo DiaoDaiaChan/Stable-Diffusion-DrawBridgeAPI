@@ -246,6 +246,7 @@ async def proxy(path: str, request: Request):
     elif path == 'sdapi/v1/options':
         resp = backend_instance.format_options_api_resp()
         result = JSONResponse(content=resp)
+        return result
     task_handler = Task_Handler({}, request, path)
 
     try:
