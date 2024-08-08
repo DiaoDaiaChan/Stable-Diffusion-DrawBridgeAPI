@@ -169,7 +169,8 @@ class Task_Handler:
         path: str = None,
         select_backend: int = None,
         reutrn_instance: bool = False,
-        model_to_backend: str = None
+        model_to_backend: str = None,
+        disable_loadbalance: bool = False
     ):
         self.payload = payload
         self.instance_list = []
@@ -180,6 +181,7 @@ class Task_Handler:
         self.reutrn_instance = reutrn_instance
         self.select_backend = select_backend
         self.model_to_backend = model_to_backend
+        self.disable_loadbalance = disable_loadbalance
 
     def get_backend_name(self, model_name) -> str:
         all_model: bytes = redis_client.get('models')
@@ -219,7 +221,8 @@ class Task_Handler:
         return self.result
 
     async def choice_backend(self):
-
+        if self.disable_loadbalance:
+            return
         backend_url_dict = self.enable_backend
         reverse_dict = {value: key for key, value in backend_url_dict.items()}
 
@@ -243,16 +246,14 @@ class Task_Handler:
             tasks.append(task)
         # 获取api队列状态
         if self.model_to_backend:
+
             key = self.get_backend_name(self.model_to_backend)
             backend_index = self.get_backend_index(backend_url_dict, key)
-
             logger.info(f"手动选择模型{self.model_to_backend}, 已选择后端{key}")
-
             self.result = await self.instance_list[backend_index].send_result_to_api()
 
         else:
             all_resp = await asyncio.gather(*tasks, return_exceptions=True)
-            logger.info(str(all_resp))
             logger.info('开始进行后端选择')
             for resp_tuple in all_resp:
                 e += 1
