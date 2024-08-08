@@ -1,4 +1,5 @@
 import asyncio
+import time
 import traceback
 import json
 import os
@@ -16,6 +17,7 @@ from backend import Task_Handler, Backend
 from base_config import setup_logger, redis_client
 
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
@@ -231,8 +233,16 @@ async def get_models(request: Request):
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def proxy(path: str, request: Request):
-
     client_host = request.client.host
+    backend_instance = Backend()
+    if path == 'sdapi/v1/progress':
+        resp = backend_instance.format_progress_api_resp(0.0, time.time())
+        result = JSONResponse(content=resp)
+        return result
+    elif path == 'sdapi/v1/memory':
+        resp = backend_instance.format_vram_api_resp()
+        result = JSONResponse(content=resp)
+        return result
     task_handler = Task_Handler({}, request, path)
 
     try:

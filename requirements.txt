@@ -10,5 +10,6 @@ pydantic-settings==2.4.0
 PyYAML
 redis
 replicate
+
 tqdm
 uvicorn

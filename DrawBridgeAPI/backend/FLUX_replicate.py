@@ -66,22 +66,7 @@ class AIDRAW(Backend):
             available = resp['available']
             progress = 0.99 if progress is False else 0.0
 
-            build_resp = {
-                "progress": progress,
-                "eta_relative": 0.0,
-                "state": {
-                "skipped": False,
-                "interrupted": False,
-                "job": "",
-                "job_count": 0,
-                "job_timestamp": self.start_time,
-                "job_no": 0,
-                "sampling_step": 0,
-                "sampling_steps": 0
-                },
-                "current_image": None,
-                "textinfo": None
-            }
+            build_resp = self.format_progress_api_resp(progress, self.start_time)
 
             sc = 200 if available is True else 500
         except:
@@ -109,7 +94,7 @@ class AIDRAW(Backend):
 
         await self.download_img()
 
-        self.build_api_respond()
+        self.format_api_respond()
 
         self.result = self.build_respond
 

@@ -4,7 +4,7 @@ import aiohttp
 import civitai
 import os
 
-from civitai import Civitai
+# from civitai import Civitai
 from io import BytesIO
 
 from .base import Backend
@@ -24,8 +24,7 @@ class AIDRAW(Backend):
         self.backend_name = self.config.backend_name_list[0]
         self.workload_name = f"{self.backend_name}-{token}"
 
-    async def get_models(self) -> list:
-        pass
+
     async def update_progress(self):
         # 覆写函数
         pass
@@ -45,22 +44,7 @@ class AIDRAW(Backend):
             available = resp['available']
             progress = 0.99 if progress is False else 0.0
 
-            build_resp = {
-                "progress": progress,
-                "eta_relative": 0.0,
-                "state": {
-                "skipped": False,
-                "interrupted": False,
-                "job": "",
-                "job_count": 0,
-                "job_timestamp": self.start_time,
-                "job_no": 0,
-                "sampling_step": 0,
-                "sampling_steps": 0
-                },
-                "current_image": None,
-                "textinfo": None
-            }
+            build_resp = self.format_progress_api_resp(progress, self.start_time)
 
             sc = 200 if available is True else 500
         except:
@@ -93,91 +77,32 @@ class AIDRAW(Backend):
                     return True, (resp_json, resp.status)
 
     async def formating_to_sd_style(self):
+
         await self.download_img()
-        try:
-            comment = await self.get_img_comment()
-        except:
-            comment = ''
-
-        build_respond = {
-            "images": self.img,
-            "parameters": {
-                "prompt": self.tags,
-                "negative_prompt": self.ntags,
-                "seed": self.seed,
-                "subseed": -1,
-                "subseed_strength": 0,
-                "seed_resize_from_h": -1,
-                "seed_resize_from_w": -1,
-                "sampler_name": '',
-                "batch_size": 1,
-                "n_iter": self.total_img_count,
-                "steps": self.steps,
-                "cfg_scale": self.scale,
-                "width": self.width,
-                "height": self.height,
-                "restore_faces": None,
-                "tiling": None,
-                "do_not_save_samples": None,
-                "do_not_save_grid": None,
-                "eta": None,
-                "denoising_strength": 0,
-                "s_min_uncond": None,
-                "s_churn": None,
-                "s_tmax": None,
-                "s_tmin": None,
-                "s_noise": None,
-                "override_settings": None,
-                "override_settings_restore_afterwards": True,
-                "refiner_checkpoint": None,
-                "refiner_switch_at": None,
-                "disable_extra_networks": False,
-                "comments": None,
-                "enable_hr": False,
-                "firstphase_width": 0,
-                "firstphase_height": 0,
-                "hr_scale": 2.0,
-                "hr_upscaler": None,
-                "hr_second_pass_steps": 0,
-                "hr_resize_x": 0,
-                "hr_resize_y": 0,
-                "hr_checkpoint_name": None,
-                "hr_sampler_name": None,
-                "hr_prompt": "",
-                "hr_negative_prompt": "",
-                "sampler_index": "Euler",
-                "script_name": None,
-                "script_args": [],
-                "send_images": True,
-                "save_images": False,
-                "alwayson_scripts": {}
-            },
-            "info": comment
-        }
-
-        self.result = build_respond
+        self.format_api_respond()
+        self.result = self.build_respond
 
     async def posting(self):
 
         self.logger.info(f"开始使用{self.token}获取图片")
 
-        class CustomCivitai(Civitai):
-            def __init__(self, api_token, env="prod"):
-                self.api_token = api_token
-                if not self.api_token:
-                    raise ValueError("API token not provided.")
+        # class CustomCivitai(Civitai):
+        #     def __init__(self, api_token, env="prod"):
+        #         self.api_token = api_token
+        #         if not self.api_token:
+        #             raise ValueError("API token not provided.")
+        #
+        #         self.base_path = "https://orchestration-dev.civitai.com" if env == "dev" else "https://orchestration.civitai.com"
+        #         self.verify = True
+        #         self.headers = {
+        #             "Authorization": f"Bearer {self.api_token}",
+        #             "Content-Type": "application/json"
+        #         }
+        #
+        #         self.image = self.Image(self)
+        #         self.jobs = self.Jobs(self)
 
-                self.base_path = "https://orchestration-dev.civitai.com" if env == "dev" else "https://orchestration.civitai.com"
-                self.verify = True
-                self.headers = {
-                    "Authorization": f"Bearer {self.api_token}",
-                    "Content-Type": "application/json"
-                }
-
-                self.image = self.Image(self)
-                self.jobs = self.Jobs(self)
-
-        civiai_ = CustomCivitai(api_token=self.token)
+        # civiai_ = CustomCivitai(api_token=self.token)
         os.environ['CIVITAI_API_TOKEN'] = self.token
         await self.check_backend_usability()
         input_ = {
