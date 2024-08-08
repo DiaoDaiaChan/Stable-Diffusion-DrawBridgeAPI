@@ -1,0 +1,31 @@
+[project]
+name = "Stable-Diffusion-DrawBridgeAPI"
+version = "0.1"
+description = "使用标准A1111-SDWEBUI API来调用各种绘画后端的多功能负载均衡API"
+authors = [
+    {name = "DiaoDaiaChan", email = "diaodaiachan@qq.com"},
+]
+dependencies = [
+    "aiohttp",
+    "Pillow",
+    "civitai",
+    "fastapi",
+    "fal-client",
+    "httpx",
+    "piexif",
+    "pydantic==2.8.2",
+    "pydantic-settings==2.4.0",
+    "PyYAML",
+    "redis",
+    "replicate",
+    "tqdm",
+    "uvicorn",
+]
+
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

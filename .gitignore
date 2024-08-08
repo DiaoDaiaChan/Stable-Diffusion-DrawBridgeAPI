@@ -1,0 +1,9 @@
+venv/
+.idea/
+__pycache__/
+DrawBridgeAPI/__pycache__/
+
+*.log
+DrawBridgeAPI/config.yaml
+TODO
+

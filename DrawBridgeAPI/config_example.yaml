@@ -1,0 +1,47 @@
+civitai: []
+#  - 21a1dc178f0e4a829a9fa30e5c88be6d
+a1111webui:
+  - name:
+      default
+    auth:
+      false
+    username:
+      admin
+    password:
+      admin
+    token:
+      xxx
+    backend_url:
+      http://127.0.0.1:7860
+    max_resolution:
+      null
+  - name:
+      default2
+    auth:
+      false
+    username:
+      xxx
+    password:
+      xxx
+    token:
+      xxx
+    backend_url:
+      http://127.0.0.1:7861
+    max_resolution:
+      1572864
+#fal-ai:
+#  - null
+#replicate:
+#  - null
+
+server_settings:
+  redis_server:
+    - 127.0.0.1
+    - 6379
+    - null
+  enable_nsfw_check:
+    false
+  return_single_img:  # 只生成以及返回一张图片
+    true
+
+

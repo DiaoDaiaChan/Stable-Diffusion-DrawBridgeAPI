@@ -1,0 +1,14 @@
+aiohttp
+Pillow
+civitai
+fastapi
+fal-client
+httpx
+piexif
+pydantic==2.8.2
+pydantic-settings==2.4.0
+PyYAML
+redis
+replicate
+tqdm
+uvicorn
