@@ -1,11 +1,12 @@
 import asyncio
 import random
+import json
 
 from tqdm import tqdm
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from base_config import setup_logger, config
+from base_config import setup_logger, config, redis_client
 from .SD_civitai_API import AIDRAW
 from .SD_A1111_webui import AIDRAW as AIDRAW2
 from .FLUX_falai import AIDRAW as AIDRAW3
@@ -167,7 +168,8 @@ class Task_Handler:
         request: Request = None,
         path: str = None,
         select_backend: int = None,
-        reutrn_instance: bool = False
+        reutrn_instance: bool = False,
+        model_to_backend: str = None
     ):
         self.payload = payload
         self.instance_list = []
@@ -176,6 +178,24 @@ class Task_Handler:
         self.path = path
         self.enable_backend = None
         self.reutrn_instance = reutrn_instance
+        self.select_backend = select_backend
+        self.model_to_backend = model_to_backend
+
+    def get_backend_name(self, model_name) -> str:
+        all_model: bytes = redis_client.get('models')
+        all_model: dict = json.loads(all_model.decode('utf-8'))
+        for key, models in all_model.items():
+            if isinstance(models, list):
+                for model in models:
+                    if model.get("model_name") == model_name:
+                        return key
+
+    def get_backend_index(self, mapping_dict, key_to_find) -> int:
+        keys = list(mapping_dict.keys())
+        if key_to_find in keys:
+            return keys.index(key_to_find)
+        return None
+
 
     async def txt2img(self):
         self.instance_list, self.enable_backend = await TXT2IMG_Handler(self.payload).get_all_instance()
@@ -222,70 +242,79 @@ class Task_Handler:
             task = i.get_backend_working_progress()
             tasks.append(task)
         # 获取api队列状态
-        all_resp = await asyncio.gather(*tasks, return_exceptions=True)
-        logger.info(str(all_resp))
-        logger.info('开始进行后端选择')
-        for resp_tuple in all_resp:
-            e += 1
-            if isinstance(resp_tuple, None or Exception):
-                logger.warning(f"后端{self.instance_list[e].workload_name}掉线")
-            else:
-                try:
-                    if resp_tuple[3] in [200, 201]:
-                        n += 1
-                        status_dict[resp_tuple[2]] = resp_tuple[0]["eta_relative"]
-                        normal_backend = (list(status_dict.keys()))
-                    else:
-                        raise RuntimeError
-                except RuntimeError or TypeError:
-                    logger.warning(f"后端{self.instance_list[e].backend_name}出错或者锁定中")
-                    continue
+        if self.model_to_backend:
+            key = self.get_backend_name(self.model_to_backend)
+            backend_index = self.get_backend_index(backend_url_dict, key)
+
+            logger.info(f"手动选择模型{self.model_to_backend}, 已选择后端{key}")
+
+            self.result = await self.instance_list[backend_index].send_result_to_api()
+
+        else:
+            all_resp = await asyncio.gather(*tasks, return_exceptions=True)
+            logger.info(str(all_resp))
+            logger.info('开始进行后端选择')
+            for resp_tuple in all_resp:
+                e += 1
+                if isinstance(resp_tuple, None or Exception):
+                    logger.warning(f"后端{self.instance_list[e].workload_name}掉线")
                 else:
-                    # 更改判断逻辑
-                    if resp_tuple[0]["progress"] in [0, 0.0]:
-                        is_avaiable += 1
-                        idle_backend.append(normal_backend[n])
+                    try:
+                        if resp_tuple[3] in [200, 201]:
+                            n += 1
+                            status_dict[resp_tuple[2]] = resp_tuple[0]["eta_relative"]
+                            normal_backend = (list(status_dict.keys()))
+                        else:
+                            raise RuntimeError
+                    except RuntimeError or TypeError:
+                        logger.warning(f"后端{self.instance_list[e].backend_name}出错或者锁定中")
+                        continue
                     else:
-                        pass
-                # 显示进度
-                total = 100
-                progress = int(resp_tuple[0]["progress"] * 100)
-                show_str = f"{list(backend_url_dict.keys())[e]}"
-                show_str = show_str.ljust(50, "-")
-                with tqdm(
-                        total=total,
-                        desc=show_str + "-->",
-                        bar_format="{l_bar}{bar}|"
-                ) as pbar:
-                    pbar.update(progress)
+                        # 更改判断逻辑
+                        if resp_tuple[0]["progress"] in [0, 0.0]:
+                            is_avaiable += 1
+                            idle_backend.append(normal_backend[n])
+                        else:
+                            pass
+                    # 显示进度
+                    total = 100
+                    progress = int(resp_tuple[0]["progress"] * 100)
+                    show_str = f"{list(backend_url_dict.keys())[e]}"
+                    show_str = show_str.ljust(50, "-")
+                    with tqdm(
+                            total=total,
+                            desc=show_str + "-->",
+                            bar_format="{l_bar}{bar}|"
+                    ) as pbar:
+                        pbar.update(progress)
 
-        if is_avaiable == 0:
-            n = -1
-            y = 0
-            normal_backend = list(status_dict.keys())
-            logger.info("没有空闲后端")
-            if len(normal_backend) == 0:
-                raise RuntimeError("没有可用后端")
-            else:
-                eta_list = list(status_dict.values())
-                for t, b in zip(eta_list, normal_backend):
-                    if int(t) < defult_eta:
-                        y += 1
-                        ava_url = b
-                        logger.info(f"已选择后端{reverse_dict[ava_url]}")
-                        break
-                    else:
-                        y += 0
-                if y == 0:
-                    reverse_sta_dict = {value: key for key, value in status_dict.items()}
-                    eta_list.sort()
-                    ava_url = reverse_sta_dict[eta_list[0]]
+            if is_avaiable == 0:
+                n = -1
+                y = 0
+                normal_backend = list(status_dict.keys())
+                logger.info("没有空闲后端")
+                if len(normal_backend) == 0:
+                    raise RuntimeError("没有可用后端")
+                else:
+                    eta_list = list(status_dict.values())
+                    for t, b in zip(eta_list, normal_backend):
+                        if int(t) < defult_eta:
+                            y += 1
+                            ava_url = b
+                            logger.info(f"已选择后端{reverse_dict[ava_url]}")
+                            break
+                        else:
+                            y += 0
+                    if y == 0:
+                        reverse_sta_dict = {value: key for key, value in status_dict.items()}
+                        eta_list.sort()
+                        ava_url = reverse_sta_dict[eta_list[0]]
 
-        if len(idle_backend) >= 1:
-            ava_url = random.choice(idle_backend)
+            if len(idle_backend) >= 1:
+                ava_url = random.choice(idle_backend)
 
-        logger.info(f"已选择后端{reverse_dict[ava_url]}")
-        ava_url_index = list(backend_url_dict.values()).index(ava_url)
-        # ava_url_tuple = (ava_url, reverse_dict[ava_url], all_resp, len(normal_backend), vram_dict[ava_url])
-        self.result = await self.instance_list[ava_url_index].send_result_to_api()
+            logger.info(f"已选择后端{reverse_dict[ava_url]}")
+            ava_url_index = list(backend_url_dict.values()).index(ava_url)
+            # ava_url_tuple = (ava_url, reverse_dict[ava_url], all_resp, len(normal_backend), vram_dict[ava_url])
+            self.result = await self.instance_list[ava_url_index].send_result_to_api()
 

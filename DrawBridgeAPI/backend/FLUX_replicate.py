@@ -23,8 +23,6 @@ class AIDRAW(Backend):
         self.backend_name = self.config.backend_name_list[3]
         self.workload_name = f"{self.backend_name}-{token}"
 
-    async def get_models(self):
-        pass
 
     async def get_shape(self):
 

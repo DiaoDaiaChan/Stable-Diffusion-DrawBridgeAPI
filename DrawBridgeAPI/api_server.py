@@ -3,12 +3,17 @@ import traceback
 import json
 import os
 import warnings
+import itertools
+import requests
+import argparse
+import uvicorn
+import threading
 
 os.environ['CIVITAI_API_TOKEN'] = 'kunkun'
 os.environ['FAL_KEY'] = 'Daisuki'
 
 from backend import Task_Handler, Backend
-from base_config import setup_logger
+from base_config import setup_logger, redis_client
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
@@ -19,6 +24,15 @@ from pydantic import BaseModel
 warnings.simplefilter("ignore", RuntimeWarning)
 
 app = FastAPI()
+
+parser = argparse.ArgumentParser(description='Run the FastAPI application.')
+parser.add_argument('--host', type=str, default='0.0.0.0',
+                    help='The host IP address to listen on (default: 0.0.0.0).')
+parser.add_argument('--port', type=int, default=8000,
+                    help='The port number to listen on (default: 8000).')
+
+args = parser.parse_args()
+port = args.port
 
 logger = setup_logger("[API]")
 
@@ -131,14 +145,26 @@ class Img2ImgRequest(BaseModel):
     # 以下为拓展
 
 
+@app.on_event("startup")
+def startup_event():
+    threading.Thread(target=make_request).start()
+
+def make_request():
+    response = requests.get(f"http://localhost:{port}/sdapi/v1/sd-models")
+
+
 # 创建两个 POST endpoint
 @app.post("/sdapi/v1/txt2img")
 async def txt2img(request: Txt2ImgRequest, api: Request):
 
     data = request.dict()
     client_host = api.client.host
+    model_to_backend = None
 
-    task_handler = Task_Handler(data)
+    if data['override_settings'].get("sd_model_checkpoint", None):
+        model_to_backend = data['override_settings'].get("sd_model_checkpoint", None)
+
+    task_handler = Task_Handler(data, model_to_backend=model_to_backend)
     try:
         logger.info(f"开始进行文生图 - {client_host}")
         result = await task_handler.txt2img()
@@ -175,21 +201,33 @@ async def img2img(request: Img2ImgRequest, api: Request):
 
     return result
 
+
 @app.get("/sdapi/v1/sd-models")
 async def get_models(request: Request):
     task_list = []
     path = '/sdapi/v1/sd-models'
-    # 返回后端实例
+
     task_handler = Task_Handler({}, request, path, reutrn_instance=True)
     instance_list: list[Backend] = await task_handler.txt2img()
-    # 执行实例的获取模型函数
+
     for i in instance_list:
         task_list.append(i.get_models())
+    resp = await asyncio.gather(*task_list)
+    models_dict = {}
+    api_respond = []
+    for i in resp:
+        models_dict = models_dict | i
+        api_respond = api_respond + list(i.values())
 
-    resp=  await asyncio.gather(*task_list)
-    print(resp)
-    # redis_pipe.excute()
-    # dict_data = json.loads(result.body.decode())
+    api_respond = list(itertools.chain.from_iterable(api_respond))
+
+    redis_resp: bytes = redis_client.get('models')
+    redis_resp: dict = json.loads(redis_resp.decode('utf-8'))
+    redis_resp.update(models_dict)
+    redis_client.set('models', json.dumps(redis_resp))
+
+    return api_respond
+
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def proxy(path: str, request: Request):
@@ -210,7 +248,6 @@ async def proxy(path: str, request: Request):
     return result
 
 
-if __name__ == "__main__":
-    import uvicorn
+uvicorn.run(app, host=args.host, port=args.port)
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+

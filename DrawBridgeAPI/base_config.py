@@ -2,6 +2,7 @@ import yaml as yaml_
 import redis
 import json
 import logging
+import asyncio
 
 from pydantic_settings import BaseSettings
 from pathlib import Path
@@ -152,7 +153,7 @@ def process_items(config, items, backend_index, name_dict):
         for i in range(len(items['name'])):
             key = f"{config.backend_name_list[backend_index]}-{items['name'][i]}"
             config.workload_dict[key] = config.base_workload_dict
-            name_dict[items['name'][i]] = items['backend_url'][i]
+            name_dict[f"a1111-{items['name'][i]}"] = items['backend_url'][i]
     else:
         for n in items:
             key = f"{config.backend_name_list[backend_index]}-{n}"
@@ -201,6 +202,3 @@ rp = redis_client.pipeline()
 rp.set('workload', workload_json)
 rp.set('models', json.dumps(models_dict))
 rp.execute()
-
-
-

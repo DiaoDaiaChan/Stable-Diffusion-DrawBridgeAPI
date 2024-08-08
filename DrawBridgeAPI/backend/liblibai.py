@@ -27,11 +27,6 @@ class AIDRAW(Backend):
         self.backend_name = self.config.backend_name_list[4]
         self.workload_name = f"{self.backend_name}-{token}"
 
-    async def get_models(self):
-        pass
-        self.model = "LiblibAI - DiaoDaia_mix_4.5"
-        self.model_hash = "c7352c5d2f"
-
     async def heart_beat(self, id_):
         self.logger.info(f"{id_}开始请求")
         for i in range(60):

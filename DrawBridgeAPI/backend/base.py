@@ -472,6 +472,7 @@ class Backend:
             }
 
             return backend_to_models_dict
+
         else:
 
             self.backend_url = self.config.a1111webui_setting['backend_url'][self.count]
