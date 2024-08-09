@@ -13,6 +13,7 @@ class AIDRAW(Backend):
         super().__init__(count=count, payload=payload, **kwargs)
 
         self.xl = self.config.liblibai_setting['xl'][self.count]
+        self.flux = self.config.liblibai_setting['flux'][self.count]
         site_name = 'LiblibAI_XL' if self.xl else 'LiblibAI'
         self.model = f"{site_name} - {self.config.liblibai_setting['model_name'][self.count]}"
         self.model_id = self.config.liblibai_setting['model'][self.count]
@@ -86,8 +87,11 @@ class AIDRAW(Backend):
 
     async def posting(self):
 
-        if self.xl:
-            pre_tag, pre_ntag = tuple(self.config.liblibai_setting.get('preference')[self.count]['pretags']['xl'])
+        if self.xl or self.flux:
+            if self.xl:
+                pre_tag, pre_ntag = tuple(self.config.liblibai_setting.get('preference')[self.count]['pretags']['xl'])
+            elif self.flux:
+                pre_tag, pre_ntag = tuple(self.config.liblibai_setting.get('preference')[self.count]['pretags']['flux'])
             self.tags = pre_tag + self.tags
             self.ntags = pre_ntag + self.ntags
             if self.enable_hr:
@@ -100,42 +104,68 @@ class AIDRAW(Backend):
 
         self.steps = self.config.liblibai_setting.get('preference')[self.count].get('steps', 12)
 
-        input_ = {
-            "checkpointId": self.model_id,
-            "generateType": 1,
-            "frontCustomerReq": {
-                # "frontId": "f46f8e35-5728-4ded-b163-832c3b85009d",
-                "frontId": "cb30fc54-db0e-4760-b40c-4fc7427ef7bc",
-                "windowId": "",
-                "tabType": "txt2img",
-                "conAndSegAndGen": "gen"
+        if self.flux:
+            input_ = {
+                "checkpointId": 2295774,
+                "generateType": 17,
+                "frontCustomerReq": {
+                    "windowId": "",
+                    "tabType": "txt2img",
+                    "conAndSegAndGen": "gen"
+                },
+                "adetailerEnable": 0,
+                "text2imgV3": {
+                    "clipSkip": 2,
+                    "checkPointName": 2295774,
+                    "prompt": self.tags,
+                    "negPrompt": self.ntags,
+                    "seed": self.seed,
+                    "randnSource": 0,
+                    "samplingMethod": 31,
+                    "imgCount": self.total_img_count,
+                    "samplingStep": self.steps,
+                    "cfgScale": self.scale,
+                    "width": self.width,
+                    "height": self.height
+                },
+                "taskQueuePriority": 1
             }
-        ,
-            "adetailerEnable": 0,
-            "text2img": {
-                "prompt": self.tags,
-                "negativePrompt": self.ntags,
-                "extraNetwork": "",
-                "samplingMethod": 0,
-                "samplingStep": self.steps,
-                "width": self.width,
-                "height": self.height,
-                "imgCount": self.total_img_count,
-                "cfgScale": self.scale,
-                "seed": self.seed,
-                "seedExtra": 0,
-                "hiResFix": 0,
-                "restoreFaces": 0,
-                "tiling": 0,
-                "clipSkip": 2,
-                "randnSource": 0,
-                "tileDiffusion": None
+        else:
+            input_ = {
+                "checkpointId": self.model_id,
+                "generateType": 1,
+                "frontCustomerReq": {
+                    # "frontId": "f46f8e35-5728-4ded-b163-832c3b85009d",
+                    "windowId": "",
+                    "tabType": "txt2img",
+                    "conAndSegAndGen": "gen"
+                }
+            ,
+                "adetailerEnable": 0,
+                "text2img": {
+                    "prompt": self.tags,
+                    "negativePrompt": self.ntags,
+                    "extraNetwork": "",
+                    "samplingMethod": 0,
+                    "samplingStep": self.steps,
+                    "width": self.width,
+                    "height": self.height,
+                    "imgCount": self.total_img_count,
+                    "cfgScale": self.scale,
+                    "seed": self.seed,
+                    "seedExtra": 0,
+                    "hiResFix": 0,
+                    "restoreFaces": 0,
+                    "tiling": 0,
+                    "clipSkip": 2,
+                    "randnSource": 0,
+                    "tileDiffusion": None
+                }
+            ,
+                "taskQueuePriority": 1
             }
-        ,
-            "taskQueuePriority": 1
-        }
 
-        if self.enable_hr:
+        if self.enable_hr and self.flux is False and self.xl is False:
 
             hr_payload = {
                 "hiresSteps": self.hr_second_pass_steps,

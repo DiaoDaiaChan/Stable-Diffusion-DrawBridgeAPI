@@ -1,19 +1,18 @@
-import random
-
 import aiohttp
+import aiofiles
 import base64
 import json
 import asyncio
 import traceback
 import time
-import httpx
-from PIL import Image
 
+from PIL import Image
 from tqdm import tqdm
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from io import BytesIO
-from copy import deepcopy
+from pathlib import Path
+from datetime import datetime
 
 from base_config import setup_logger
 from base_config import redis_client, config
@@ -59,6 +58,7 @@ class Backend:
             self.init_images = None
 
         self.xl = False
+        self.flux = False
         self.clip_skip = 2
         self.final_width = None
         self.final_height = None
@@ -235,6 +235,26 @@ class Backend:
             models_resp_list.append(built_reps)
 
         return models_resp_list
+
+    @staticmethod
+    async def save_image(img_data, save_path):
+        """
+        异步保存图片数据到指定路径。
+        :param img_data: 图片的字节数据
+        :param save_path: 保存图片的完整路径
+        """
+        async with aiofiles.open(save_path, 'wb') as img_file:
+            await img_file.write(img_data)
+
+    @staticmethod
+    async def run_later(func, delay=1):
+        loop = asyncio.get_running_loop()
+        loop.call_later(
+            delay,
+            lambda: loop.create_task(
+                func
+            )
+        )
 
     @staticmethod
     def format_progress_api_resp(progress, start_time) -> dict:
@@ -646,16 +666,27 @@ class Backend:
 
     async def download_img(self, image_list=None):
         """
-        使用aiohttp下载图片
-        :return:
+        使用aiohttp下载图片并保存到指定路径。
         """
+        # 获取当前日期，格式为 '年月日'
+        current_date = datetime.now().strftime('%Y%m%d')
+
+        # 设置保存路径
+        save_path = Path(f'saved_images/txt2img/{current_date}/{self.workload_name[:12]}')
+        save_path.mkdir(parents=True, exist_ok=True)  # 自动创建目录
+
         for url in self.img_url:
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
-
                     if response.status == 200:
                         img_data = await response.read()
                         self.logger.info("图片下载成功")
+
+                        # 保存图片数据
+                        img_filename = save_path / Path(url).name
+                        await self.run_later(self.save_image(img_data, img_filename), 1)
+
+                        # 处理图片数据
                         self.img.append(base64.b64encode(img_data).decode('utf-8'))
                         self.img_btyes.append(img_data)
                     else:
