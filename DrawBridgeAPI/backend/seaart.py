@@ -51,8 +51,9 @@ class AIDRAW(Backend):
 
                         elif isinstance(urls, list):
                             for url in urls:
+                                await self.set_backend_working_status(available=True)
+                                self.logger.img(f"图片url: {url['url']}")
                                 self.img_url.append(url['url'])
-
                             return
 
         raise RuntimeError(f"任务 {id_} 在60次心跳后仍未完成")

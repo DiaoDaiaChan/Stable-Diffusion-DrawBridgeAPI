@@ -50,6 +50,7 @@ class AIDRAW(Backend):
                                 matched = False
                                 for img in task['items']:
                                     if 'workspace.tusiassets.com' in img['url']:
+                                        self.logger.img(f"图片url: {img['url']}")
                                         self.img_url.append(img['url'])
                                         matched = True
 

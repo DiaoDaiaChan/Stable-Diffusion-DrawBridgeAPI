@@ -1,47 +1,122 @@
-civitai: []
-#  - 21a1dc178f0e4a829a9fa30e5c88be6d
-a1111webui:
-  - name:
-      default
-    auth:
-      false
-    username:
-      admin
-    password:
-      admin
-    token:
-      xxx
-    backend_url:
-      http://127.0.0.1:7860
-    max_resolution:
-      null
-  - name:
-      default2
-    auth:
-      false
-    username:
-      xxx
-    password:
-      xxx
-    token:
-      xxx
-    backend_url:
-      http://127.0.0.1:7861
-    max_resolution:
-      1572864
-#fal-ai:
-#  - null
-#replicate:
-#  - null
+civitai_setting: # {"token": []}
+  token:
+    -
+  model:
+    ''
+  proxy:
+    -
+a1111webui_setting:
+  backend_url:
+    - http://127.0.0.1:7860
+    - http://127.0.0.1:7861
+  name:
+    - 后端1
+    - 后端2
+  auth:
+    - false
+    - false
+  username:
+    - admin
+    - admin
+  password:
+    - admin
+    - admin
+  max_resolution:
+    - null
+    - 1572864
+fal_ai_setting: # {"token": []}
+  token:
+    -
+  model:
+    ''
+replicate_setting: # {"token": []}
+  token:
+    -
+  model:
+    ''
+liblibai_setting:
+  token:
+    -
+    -
+  model:
+    - 2332049
+    - 1135059
+  model_name:
+    - "DiaoDaiaMix - 二次元风格"
+    - "Colorful Anime XL 彩璃二次元XL"
+  xl:
+    - false
+    - true
+  flux:
+    - false
+    - false
+  preference:
+    - pretags:  # 内置prompt
+        1.5:
+          - ''
+          - ''
+        xl:
+          - ""
+          - ""
+        flux:
+          - ''
+          - ''
+      steps: 20
+
+    - pretags: # 内置prompt
+        1.5:
+          - ''
+          - ''
+        xl:
+          - "finely detail,(((masterpiece))),((extremely detailed CG unity 8k wallpaper)),best quality,high resolution illustration,Amazing,highres,intricate detail,best illumination,"
+          - "lowres,bad anatomy,bad hands,text,error,missing fingers,extra digit,fewer digits,cropped,worst quality,low quality,normal quality,jpeg artifacts,signature,watermark,username,blurry,artist name,"
+        flux:
+          - ''
+          - ''
+      steps: 12
+tusiart_setting:
+  token:
+    -
+  model:
+    - 708770380971558251
+  note:
+    - 备注
+  referer:
+    - https://tusiart.com/u/759763664390847335
+    -
+seaart_setting:
+  token:
+    -
+  model:
+    -
+yunjie_setting:
+  token:
+    -
+  model:
+    -
+  note:
+      - 移动
 
 server_settings:
+  enable_txt2img_backends: [5,6,7,8,9,10,11]
+  enable_img2img_backends: [1]
+#  enable_sdapi_backends: [1]
   redis_server:
     - 127.0.0.1
     - 6379
     - null
   enable_nsfw_check:
     false
-  return_single_img:  # 只生成以及返回一张图片
+  save_image:
     true
 
+backend_name_list:
+  - civitai
+  - a1111
+  - falai
+  - replicate
+  - liblibai
+  - tusiart
+  - seaart
+  - yunjie
 

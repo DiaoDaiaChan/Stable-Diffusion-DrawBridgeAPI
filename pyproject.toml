@@ -10,6 +10,7 @@ dependencies = [
     "aiofiles",
     "Pillow",
     "civitai",
+    "colorama",
     "fastapi",
     "fal-client",
     "httpx",

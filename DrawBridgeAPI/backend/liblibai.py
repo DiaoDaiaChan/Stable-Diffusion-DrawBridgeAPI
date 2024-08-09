@@ -130,6 +130,7 @@ class AIDRAW(Backend):
                 },
                 "taskQueuePriority": 1
             }
+
         else:
             input_ = {
                 "checkpointId": self.model_id,
@@ -197,6 +198,9 @@ class AIDRAW(Backend):
                     pass
                 else:
                     task = await resp.json()
+                    if task['msg'] == 'Insufficient power':
+                        self.logger.warning('费用不足!')
+                    self.logger.info(f"API返回{task}")
                     task_id = task['data']
                     await self.heart_beat(task_id)
 

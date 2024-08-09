@@ -1,11 +1,9 @@
-import json
 import traceback
 import piexif
 import aiohttp
-import civitai
 import os
+import civitai
 
-from civitai import Civitai
 from io import BytesIO
 
 from .base import Backend
@@ -107,7 +105,8 @@ class AIDRAW(Backend):
         #         self.image = self.Image(self)
         #         self.jobs = self.Jobs(self)
         #
-        # civiai_ = CustomCivitai(api_token=self.token)
+        # civitai_ = CustomCivitai(api_token=self.token)
+
         os.environ['CIVITAI_API_TOKEN'] = self.token
         os.environ['HTTP_PROXY'] = self.config.civitai_setting['proxy'][self.count]
         os.environ['HTTPS_PROXY'] = self.config.civitai_setting['proxy'][self.count]
