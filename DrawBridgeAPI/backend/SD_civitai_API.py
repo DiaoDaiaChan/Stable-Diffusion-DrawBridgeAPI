@@ -1,10 +1,11 @@
+import json
 import traceback
 import piexif
 import aiohttp
 import civitai
 import os
 
-# from civitai import Civitai
+from civitai import Civitai
 from io import BytesIO
 
 from .base import Backend
@@ -67,8 +68,12 @@ class AIDRAW(Backend):
 
     async def check_backend_usability(self):
 
+        self.headers['Authorization'] = f"Bearer {self.token}"
         async with aiohttp.ClientSession(headers=self.headers) as session:
-            async with session.get('https://civitai.com/api/v1/models') as resp:
+            async with session.get(
+                    'https://civitai.com/api/v1/models',
+                    proxy=self.config.civitai_setting['proxy'][self.count]
+            ) as resp:
                 if resp.status != 200:
                     self.fail_on_login = True
                     return False
@@ -101,16 +106,19 @@ class AIDRAW(Backend):
         #
         #         self.image = self.Image(self)
         #         self.jobs = self.Jobs(self)
-
+        #
         # civiai_ = CustomCivitai(api_token=self.token)
         os.environ['CIVITAI_API_TOKEN'] = self.token
+        os.environ['HTTP_PROXY'] = self.config.civitai_setting['proxy'][self.count]
+        os.environ['HTTPS_PROXY'] = self.config.civitai_setting['proxy'][self.count]
         await self.check_backend_usability()
+
         input_ = {
             "model": "urn:air:sd1:checkpoint:civitai:4201@130072",
             "params": {
                 "prompt": self.tags,
                 "negativePrompt": self.ntags,
-                "scheduler": None,
+                "scheduler": self.sampler,
                 "steps": self.steps,
                 "cfgScale": self.scale,
                 "width": self.width,

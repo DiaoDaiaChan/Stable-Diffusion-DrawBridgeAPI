@@ -42,7 +42,7 @@ class Backend:
         self.scale: float = payload.get('cfg_scale', 7.0)
         self.width: int = payload.get('width', 512)
         self.height: int = payload.get('height', 512)
-        self.sampler: str = payload.get('sampler_name', None)
+        self.sampler: str = payload.get('sampler_name', "Euler")
 
         self.batch_size: int = payload.get('batch_size', 1)
         self.batch_count: int = payload.get('n_iter', 1)
@@ -70,7 +70,7 @@ class Backend:
         self.backend_url = backend_url  # 后端url
         self.headers = {
             "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0",
         }  # 后端headers
         self.login = login  # 是否需要登录后端
         self.token = token  # 后端token

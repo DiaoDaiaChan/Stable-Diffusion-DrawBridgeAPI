@@ -235,6 +235,7 @@ async def get_models(request: Request):
 async def proxy(path: str, request: Request):
     client_host = request.client.host
     backend_instance = Backend()
+
     if path == 'sdapi/v1/progress':
         resp = backend_instance.format_progress_api_resp(0.0, time.time())
         result = JSONResponse(content=resp)
@@ -247,6 +248,7 @@ async def proxy(path: str, request: Request):
         resp = backend_instance.format_options_api_resp()
         result = JSONResponse(content=resp)
         return result
+
     task_handler = Task_Handler({}, request, path)
 
     try:
@@ -254,7 +256,7 @@ async def proxy(path: str, request: Request):
         result = await task_handler.sd_api()
     except Exception as e:
         logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(500, detail=str(e))
 
     if result is None:
         raise HTTPException(500, detail='Result not found')

@@ -25,8 +25,29 @@ class CustomFormatter(logging.Formatter):
 
 
 # 字典用于跟踪已创建的日志记录器
-loggers = {}
 
+empty_dict = {"token": None}
+
+
+class CustomFormatter(logging.Formatter):
+    """Custom formatter to add a fixed color for the prefix and variable colors for the log levels."""
+    def __init__(self, prefix="", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.prefix = f"\033[94m{prefix}\033[0m"  # 固定蓝色前缀
+        self.FORMATS = {
+            logging.DEBUG: f"{self.prefix} \033[94m[DEBUG]\033[0m %(message)s",
+            logging.INFO: f"{self.prefix} \033[92m[INFO]\033[0m %(message)s",
+            logging.WARNING: f"{self.prefix} \033[93m[WARNING]\033[0m %(message)s",
+            logging.ERROR: f"{self.prefix} \033[91m[ERROR]\033[0m %(message)s",
+            logging.CRITICAL: f"{self.prefix} \033[95m[CRITICAL]\033[0m %(message)s"
+        }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+loggers = {}
 
 def setup_logger(custom_prefix="[MAIN]"):
     # 检查是否已经存在具有相同前缀的 logger
@@ -70,23 +91,26 @@ class Config(BaseSettings):
 
     server_settings: dict = None
 
-    civitai_setting: dict = {"token": None}
+    civitai_setting: dict = empty_dict
     a1111webui_setting: dict = {"backend_url": None}
-    fal_ai_setting: dict = {"token": None}
-    replicate_setting: dict = {"token": None}
-    liblibai_setting: dict = {"token": None}
+    fal_ai_setting: dict = empty_dict
+    replicate_setting: dict = empty_dict
+    liblibai_setting: dict = empty_dict
+    tusiart_setting: dict = empty_dict
 
     civitai: list or None = []
     a1111webui: list = []
     fal_ai: list = []
     replicate: list = []
     liblibai: list = []
+    tusiart: list = []
 
     civitai_name: dict = {}
     a1111webui_name: dict = {}
     fal_ai_name: dict = {}
     replicate_name: dict = {}
     liblibai_name: dict = {}
+    tusiart_name: dict = {}
 
     server_settings: dict = {}
     retry_times: int = 1
@@ -138,6 +162,7 @@ config.a1111webui = config.a1111webui_setting
 config.fal_ai = config.fal_ai_setting['token']
 config.replicate = config.replicate_setting['token']
 config.liblibai = config.liblibai_setting['token']
+config.tusiart = config.tusiart_setting['token']
 
 sources_list = [
     (config.civitai, 0, config.civitai_name),
@@ -145,6 +170,7 @@ sources_list = [
     (config.fal_ai, 2, config.fal_ai_name),
     (config.replicate, 3, config.replicate_name),
     (config.liblibai, 4, config.liblibai_name),
+    (config.tusiart, 5, config.tusiart_name),
 ]
 
 

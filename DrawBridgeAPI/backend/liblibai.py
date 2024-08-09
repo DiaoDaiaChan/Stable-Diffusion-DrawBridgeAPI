@@ -3,12 +3,6 @@ import json
 import traceback
 
 import aiohttp
-import piexif
-import os
-import replicate
-
-from io import BytesIO
-from PIL import Image
 
 from .base import Backend
 

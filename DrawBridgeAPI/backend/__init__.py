@@ -12,6 +12,7 @@ from .SD_A1111_webui import AIDRAW as AIDRAW2
 from .FLUX_falai import AIDRAW as AIDRAW3
 from .FLUX_replicate import AIDRAW as AIDRAW4
 from .liblibai import AIDRAW as AIDRAW5
+from .tusiart import AIDRAW as AIDRAW6
 from .base import Backend
 
 
@@ -46,7 +47,8 @@ class Base_Handler:
             self.get_a1111_task(),
             self.get_falai_task(),
             self.get_replicate_task(),
-            self.get_liblibai_task()
+            self.get_liblibai_task(),
+            self.get_tusiart_task()
         ]
 
         all_backend_instance = await asyncio.gather(*tasks)
@@ -109,12 +111,24 @@ class Base_Handler:
                 instance_list.append(aidraw_instance)
 
         return instance_list
+
     async def get_liblibai_task(self):
         instance_list = []
         counter = 0
         for i in config.liblibai:
             if i is not None:
                 aidraw_instance = AIDRAW5(count=counter, payload=self.payload)
+                counter += 1
+                instance_list.append(aidraw_instance)
+
+        return instance_list
+
+    async def get_tusiart_task(self):
+        instance_list = []
+        counter = 0
+        for i in config.tusiart:
+            if i is not None:
+                aidraw_instance = AIDRAW6(count=counter, payload=self.payload)
                 counter += 1
                 instance_list.append(aidraw_instance)
 
@@ -189,7 +203,7 @@ class Task_Handler:
         for key, models in all_model.items():
             if isinstance(models, list):
                 for model in models:
-                    if model.get("model_name") == model_name:
+                    if model.get("title") == model_name:
                         return key
 
     def get_backend_index(self, mapping_dict, key_to_find) -> int:
@@ -236,6 +250,7 @@ class Task_Handler:
         defult_eta = 20
         normal_backend = None
         idle_backend = []
+        slice = [24]
 
         logger = setup_logger(custom_prefix='[LOAD_BALANCE]')
         if self.reutrn_instance:
@@ -249,7 +264,7 @@ class Task_Handler:
 
             key = self.get_backend_name(self.model_to_backend)
             backend_index = self.get_backend_index(backend_url_dict, key)
-            logger.info(f"手动选择模型{self.model_to_backend}, 已选择后端{key}")
+            logger.info(f"手动选择模型{self.model_to_backend}, 已选择后端{key[:24]}")
             self.result = await self.instance_list[backend_index].send_result_to_api()
 
         else:
@@ -258,7 +273,7 @@ class Task_Handler:
             for resp_tuple in all_resp:
                 e += 1
                 if isinstance(resp_tuple, None or Exception):
-                    logger.warning(f"后端{self.instance_list[e].workload_name}掉线")
+                    logger.warning(f"后端{self.instance_list[e].workload_name[:24]}掉线")
                 else:
                     try:
                         if resp_tuple[3] in [200, 201]:
@@ -268,7 +283,7 @@ class Task_Handler:
                         else:
                             raise RuntimeError
                     except RuntimeError or TypeError:
-                        logger.warning(f"后端{self.instance_list[e].backend_name}出错或者锁定中")
+                        logger.warning(f"后端{self.instance_list[e].backend_name[:24]}出错或者锁定中")
                         continue
                     else:
                         # 更改判断逻辑
@@ -280,7 +295,7 @@ class Task_Handler:
                     # 显示进度
                     total = 100
                     progress = int(resp_tuple[0]["progress"] * 100)
-                    show_str = f"{list(backend_url_dict.keys())[e]}"
+                    show_str = f"{list(backend_url_dict.keys())[e][:24]}"
                     show_str = show_str.ljust(50, "-")
                     with tqdm(
                             total=total,
@@ -302,7 +317,7 @@ class Task_Handler:
                         if int(t) < defult_eta:
                             y += 1
                             ava_url = b
-                            logger.info(f"已选择后端{reverse_dict[ava_url]}")
+                            logger.info(f"已选择后端{reverse_dict[ava_url][:24]}")
                             break
                         else:
                             y += 0
@@ -314,7 +329,7 @@ class Task_Handler:
             if len(idle_backend) >= 1:
                 ava_url = random.choice(idle_backend)
 
-            logger.info(f"已选择后端{reverse_dict[ava_url]}")
+            logger.info(f"已选择后端{reverse_dict[ava_url][:24]}")
             ava_url_index = list(backend_url_dict.values()).index(ava_url)
             # ava_url_tuple = (ava_url, reverse_dict[ava_url], all_resp, len(normal_backend), vram_dict[ava_url])
             self.result = await self.instance_list[ava_url_index].send_result_to_api()

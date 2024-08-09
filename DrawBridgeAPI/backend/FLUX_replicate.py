@@ -23,7 +23,6 @@ class AIDRAW(Backend):
         self.backend_name = self.config.backend_name_list[3]
         self.workload_name = f"{self.backend_name}-{token}"
 
-
     async def get_shape(self):
 
         aspect_ratio = self.width / self.height
@@ -102,6 +101,8 @@ class AIDRAW(Backend):
 
         os.environ['REPLICATE_API_TOKEN'] = self.token
         image_shape = await self.get_shape()
+
+        print(image_shape)
 
         input_ = {
             "prompt": self.tags,
