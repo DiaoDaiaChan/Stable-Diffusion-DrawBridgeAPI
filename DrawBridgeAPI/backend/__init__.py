@@ -5,6 +5,9 @@ import json
 from tqdm import tqdm
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from colorama import Fore, Style
+from colorama import init
+init()
 
 from base_config import setup_logger, config, redis_client
 from .SD_civitai_API import AIDRAW
@@ -13,6 +16,8 @@ from .FLUX_falai import AIDRAW as AIDRAW3
 from .FLUX_replicate import AIDRAW as AIDRAW4
 from .liblibai import AIDRAW as AIDRAW5
 from .tusiart import AIDRAW as AIDRAW6
+from .seaart import AIDRAW as AIDRAW7
+from .yunjie import AIDRAW as AIDRAW8
 from .base import Backend
 
 
@@ -48,7 +53,9 @@ class Base_Handler:
             self.get_falai_task(),
             self.get_replicate_task(),
             self.get_liblibai_task(),
-            self.get_tusiart_task()
+            self.get_tusiart_task(),
+            self.get_seaart_task(),
+            self.get_yunjie_task()
         ]
 
         all_backend_instance = await asyncio.gather(*tasks)
@@ -129,6 +136,28 @@ class Base_Handler:
         for i in config.tusiart:
             if i is not None:
                 aidraw_instance = AIDRAW6(count=counter, payload=self.payload)
+                counter += 1
+                instance_list.append(aidraw_instance)
+
+        return instance_list
+
+    async def get_seaart_task(self):
+        instance_list = []
+        counter = 0
+        for i in config.seaart:
+            if i is not None:
+                aidraw_instance = AIDRAW7(count=counter, payload=self.payload)
+                counter += 1
+                instance_list.append(aidraw_instance)
+
+        return instance_list
+
+    async def get_yunjie_task(self):
+        instance_list = []
+        counter = 0
+        for i in config.yunjie:
+            if i is not None:
+                aidraw_instance = AIDRAW8(count=counter, payload=self.payload)
                 counter += 1
                 instance_list.append(aidraw_instance)
 
@@ -297,10 +326,14 @@ class Task_Handler:
                     progress = int(resp_tuple[0]["progress"] * 100)
                     show_str = f"{list(backend_url_dict.keys())[e][:24]}"
                     show_str = show_str.ljust(50, "-")
+
+                    # Create a custom bar format using colorama
+                    bar_format = f"{Fore.CYAN}[Progress] {{l_bar}}{{bar}}|{Style.RESET_ALL}"
+
                     with tqdm(
                             total=total,
                             desc=show_str + "-->",
-                            bar_format="{l_bar}{bar}|"
+                            bar_format=bar_format
                     ) as pbar:
                         pbar.update(progress)
 

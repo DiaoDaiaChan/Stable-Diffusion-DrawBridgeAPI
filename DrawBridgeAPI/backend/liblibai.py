@@ -12,7 +12,10 @@ class AIDRAW(Backend):
     def __init__(self, count, payload, **kwargs):
         super().__init__(count=count, payload=payload, **kwargs)
 
-        self.model = "LiblibAI - DiaoDaia_mix_4.5"
+        self.xl = self.config.liblibai_setting['xl'][self.count]
+        site_name = 'LiblibAI_XL' if self.xl else 'LiblibAI'
+        self.model = f"{site_name} - {self.config.liblibai_setting['model_name'][self.count]}"
+        self.model_id = self.config.liblibai_setting['model'][self.count]
         self.model_hash = "c7352c5d2f"
         self.logger = self.setup_logger('[LiblibAI]')
 
@@ -44,6 +47,7 @@ class AIDRAW(Backend):
                     else:
                         await self.set_backend_working_status(available=True)
                         for i in images:
+                            self.logger.img(f"图片url: {i['previewPath']}")
                             self.img_url.append(i['previewPath'])
                             self.comment = i['imageInfo']
                         break
@@ -82,8 +86,22 @@ class AIDRAW(Backend):
 
     async def posting(self):
 
+        if self.xl:
+            pre_tag, pre_ntag = tuple(self.config.liblibai_setting.get('preference')[self.count]['pretags']['xl'])
+            self.tags = pre_tag + self.tags
+            self.ntags = pre_ntag + self.ntags
+            if self.enable_hr:
+                self.width = int(self.width * self.hr_scale)
+                self.height = int(self.height * self.scale)
+                self.enable_hr = False
+            elif self.width * self.height < 1048576:
+                self.width = int(self.width * 1.5)
+                self.height = int(self.height * 1.5)
+
+        self.steps = self.config.liblibai_setting.get('preference')[self.count].get('steps', 12)
+
         input_ = {
-            "checkpointId": 2332049,
+            "checkpointId": self.model_id,
             "generateType": 1,
             "frontCustomerReq": {
                 # "frontId": "f46f8e35-5728-4ded-b163-832c3b85009d",

@@ -28,24 +28,39 @@ class CustomFormatter(logging.Formatter):
 
 empty_dict = {"token": None}
 
+import logging
 
 class CustomFormatter(logging.Formatter):
     """Custom formatter to add a fixed color for the prefix and variable colors for the log levels."""
-    def __init__(self, prefix="", *args, **kwargs):
+    def __init__(self, prefix="", img_prefix="", *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.prefix = f"\033[94m{prefix}\033[0m"  # 固定蓝色前缀
+        self.img_prefix = f"\033[93m{img_prefix}\033[0m"  # 固定黄色前缀
         self.FORMATS = {
             logging.DEBUG: f"{self.prefix} \033[94m[DEBUG]\033[0m %(message)s",
             logging.INFO: f"{self.prefix} \033[92m[INFO]\033[0m %(message)s",
             logging.WARNING: f"{self.prefix} \033[93m[WARNING]\033[0m %(message)s",
             logging.ERROR: f"{self.prefix} \033[91m[ERROR]\033[0m %(message)s",
-            logging.CRITICAL: f"{self.prefix} \033[95m[CRITICAL]\033[0m %(message)s"
+            logging.CRITICAL: f"{self.prefix} \033[95m[CRITICAL]\033[0m %(message)s",
+            "IMG": f"{self.img_prefix} \033[93m[IMG]\033[0m %(message)s"  # 黄色前缀的 IMG 日志
         }
 
     def format(self, record):
-        log_fmt = self.FORMATS.get(record.levelno)
+        log_fmt = self.FORMATS.get(record.levelno, self.FORMATS.get("IMG"))
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
+
+
+class CustomLogger(logging.Logger):
+    """Custom logger class to add an img method."""
+    def __init__(self, name, level=logging.DEBUG):
+        super().__init__(name, level)
+        self.img_level = 25  # 自定义日志等级
+        logging.addLevelName(self.img_level, "IMG")
+
+    def img(self, msg, *args, **kwargs):
+        if self.isEnabledFor(self.img_level):
+            self._log(self.img_level, msg, args, **kwargs)
 
 loggers = {}
 
@@ -54,8 +69,8 @@ def setup_logger(custom_prefix="[MAIN]"):
     if custom_prefix in loggers:
         return loggers[custom_prefix]
 
-    # 创建日志记录器
-    logger = logging.getLogger(custom_prefix)
+    # 使用自定义的 Logger 类
+    logger = CustomLogger(custom_prefix)
     logger.setLevel(logging.DEBUG)
 
     # 创建一个控制台处理器并设置日志级别为DEBUG
@@ -70,20 +85,28 @@ def setup_logger(custom_prefix="[MAIN]"):
     error_file_handler = logging.FileHandler('log_error.log')
     error_file_handler.setLevel(logging.ERROR)
 
+    # 创建一个文件处理器来保存IMG日志到 log_img.log
+    img_file_handler = logging.FileHandler('log_img.log')
+    img_file_handler.setLevel(logger.img_level)
+
     # 创建格式器并将其添加到处理器
-    formatter = CustomFormatter(prefix=custom_prefix)
+    formatter = CustomFormatter(prefix=custom_prefix, img_prefix=custom_prefix)
     console_handler.setFormatter(formatter)
     file_handler.setFormatter(formatter)
     error_file_handler.setFormatter(formatter)
+    img_file_handler.setFormatter(formatter)
 
     # 将处理器添加到日志记录器
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
     logger.addHandler(error_file_handler)
+    logger.addHandler(img_file_handler)
+
     # 将创建的 logger 存储在字典中
     loggers[custom_prefix] = logger
 
     return logger
+
 
 
 class Config(BaseSettings):
@@ -97,6 +120,8 @@ class Config(BaseSettings):
     replicate_setting: dict = empty_dict
     liblibai_setting: dict = empty_dict
     tusiart_setting: dict = empty_dict
+    seaart_setting: dict = empty_dict
+    yunjie_setting: dict = empty_dict
 
     civitai: list or None = []
     a1111webui: list = []
@@ -104,6 +129,8 @@ class Config(BaseSettings):
     replicate: list = []
     liblibai: list = []
     tusiart: list = []
+    seaart: list = []
+    yunjie: list = []
 
     civitai_name: dict = {}
     a1111webui_name: dict = {}
@@ -111,6 +138,8 @@ class Config(BaseSettings):
     replicate_name: dict = {}
     liblibai_name: dict = {}
     tusiart_name: dict = {}
+    seaart_name: dict = {}
+    yunjie_name: dict = {}
 
     server_settings: dict = {}
     retry_times: int = 1
@@ -163,6 +192,8 @@ config.fal_ai = config.fal_ai_setting['token']
 config.replicate = config.replicate_setting['token']
 config.liblibai = config.liblibai_setting['token']
 config.tusiart = config.tusiart_setting['token']
+config.seaart = config.seaart_setting['token']
+config.yunjie = config.yunjie_setting['token']
 
 sources_list = [
     (config.civitai, 0, config.civitai_name),
@@ -171,6 +202,8 @@ sources_list = [
     (config.replicate, 3, config.replicate_name),
     (config.liblibai, 4, config.liblibai_name),
     (config.tusiart, 5, config.tusiart_name),
+    (config.seaart, 6, config.seaart_name),
+    (config.yunjie, 7, config.yunjie_name),
 ]
 
 

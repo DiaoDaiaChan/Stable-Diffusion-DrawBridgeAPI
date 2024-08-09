@@ -9,6 +9,8 @@ import requests
 import argparse
 import uvicorn
 import threading
+import logging
+import warnings
 
 os.environ['CIVITAI_API_TOKEN'] = 'kunkun'
 os.environ['FAL_KEY'] = 'Daisuki'
@@ -36,7 +38,13 @@ parser.add_argument('--port', type=int, default=8000,
 args = parser.parse_args()
 port = args.port
 
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 logger = setup_logger("[API]")
+logging.getLogger("uvicorn.access").disabled = True
+logging.getLogger("uvicorn.error").disabled = True
+logging.getLogger("fastapi").disabled = True
+
 
 class Txt2ImgRequest(BaseModel):
     prompt: Optional[str] = ""
@@ -151,6 +159,7 @@ class Img2ImgRequest(BaseModel):
 def startup_event():
     threading.Thread(target=make_request).start()
 
+
 def make_request():
     response = requests.get(f"http://localhost:{port}/sdapi/v1/sd-models")
 
@@ -206,6 +215,7 @@ async def img2img(request: Img2ImgRequest, api: Request):
 
 @app.get("/sdapi/v1/sd-models")
 async def get_models(request: Request):
+
     task_list = []
     path = '/sdapi/v1/sd-models'
 
@@ -227,7 +237,6 @@ async def get_models(request: Request):
     redis_resp: dict = json.loads(redis_resp.decode('utf-8'))
     redis_resp.update(models_dict)
     redis_client.set('models', json.dumps(redis_resp))
-
     return api_respond
 
 
@@ -237,17 +246,11 @@ async def proxy(path: str, request: Request):
     backend_instance = Backend()
 
     if path == 'sdapi/v1/progress':
-        resp = backend_instance.format_progress_api_resp(0.0, time.time())
-        result = JSONResponse(content=resp)
-        return result
+        return JSONResponse(backend_instance.format_progress_api_resp(0.0, time.time()))
     elif path == 'sdapi/v1/memory':
-        resp = backend_instance.format_vram_api_resp()
-        result = JSONResponse(content=resp)
-        return result
+        return JSONResponse(backend_instance.format_vram_api_resp())
     elif path == 'sdapi/v1/options':
-        resp = backend_instance.format_options_api_resp()
-        result = JSONResponse(content=resp)
-        return result
+        return JSONResponse(backend_instance.format_options_api_resp())
 
     task_handler = Task_Handler({}, request, path)
 
@@ -264,6 +267,7 @@ async def proxy(path: str, request: Request):
     return result
 
 
-uvicorn.run(app, host=args.host, port=args.port)
+uvicorn.run(app, host=args.host, port=args.port, log_level='critical')
+# uvicorn.run(app, host=args.host, port=args.port)
 
 

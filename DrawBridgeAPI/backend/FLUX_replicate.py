@@ -102,8 +102,6 @@ class AIDRAW(Backend):
         os.environ['REPLICATE_API_TOKEN'] = self.token
         image_shape = await self.get_shape()
 
-        print(image_shape)
-
         input_ = {
             "prompt": self.tags,
             "seed": self.seed,

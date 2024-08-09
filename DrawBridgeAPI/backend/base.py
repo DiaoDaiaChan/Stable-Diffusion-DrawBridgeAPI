@@ -43,6 +43,7 @@ class Backend:
         self.width: int = payload.get('width', 512)
         self.height: int = payload.get('height', 512)
         self.sampler: str = payload.get('sampler_name', "Euler")
+        self.restore_faces: bool = payload.get('restore_faces', False)
 
         self.batch_size: int = payload.get('batch_size', 1)
         self.batch_count: int = payload.get('n_iter', 1)
@@ -57,10 +58,12 @@ class Backend:
         if self.init_images is not None and len(self.init_images) == 0:
             self.init_images = None
 
+        self.xl = False
         self.clip_skip = 2
         self.final_width = None
         self.final_height = None
         self.model = "DiaoDaia"
+        self.model_id = '20204'
         self.model_hash = "c7352c5d2f"
         self.model_list: list = []
 
@@ -775,16 +778,20 @@ class Backend:
         else:
 
             self.backend_url = self.config.a1111webui_setting['backend_url'][self.count]
-            respond = await http_request(
-                "GET",
-                f"{self.backend_url}/sdapi/v1/sd-models"
-            )
+            try:
+                respond = await http_request(
+                    "GET",
+                    f"{self.backend_url}/sdapi/v1/sd-models",
+                )
+            except Exception:
+                respond = []
 
-            backend_to_models_dict = {
-                self.workload_name: respond
-            }
+            finally:
+                backend_to_models_dict = {
+                    self.workload_name: respond
+                }
 
-            return backend_to_models_dict
+                return backend_to_models_dict
 
 
 
