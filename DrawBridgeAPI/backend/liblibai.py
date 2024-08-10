@@ -96,7 +96,7 @@ class AIDRAW(Backend):
             self.ntags = pre_ntag + self.ntags
             if self.enable_hr:
                 self.width = int(self.width * self.hr_scale)
-                self.height = int(self.height * self.scale)
+                self.height = int(self.height * self.hr_scale)
                 self.enable_hr = False
             elif self.width * self.height < 1048576:
                 self.width = int(self.width * 1.5)

@@ -601,6 +601,7 @@ class Backend:
                     self.result = JSONResponse(content=resp, status_code=response.status_code)
                 else:
                     await self.posting()
+                break
 
             except Exception as e:
 

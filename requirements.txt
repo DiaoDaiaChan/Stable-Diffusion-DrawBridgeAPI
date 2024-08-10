@@ -1,6 +1,6 @@
 aiohttp
 aiofiles
-Pillow
+Pillow==10.4.0
 civitai
 colorama
 fastapi

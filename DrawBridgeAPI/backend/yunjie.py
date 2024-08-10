@@ -48,12 +48,12 @@ class AIDRAW(Backend):
                         continue
 
                     for item in items:
+                        await self.set_backend_working_status(available=True)
                         url = item.get("url")
 
                         if url:
                             self.logger.img(f"图片url: {url}")
                             self.img_url.append(url)
-                            await self.set_backend_working_status(available=True)
                             return
 
         raise RuntimeError(f"任务 {id_} 在60次心跳后仍未完成")

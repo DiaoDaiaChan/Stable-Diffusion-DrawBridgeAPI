@@ -142,7 +142,7 @@ class Config(BaseSettings):
     yunjie_name: dict = {}
 
     server_settings: dict = {}
-    retry_times: int = 1
+    retry_times: int = 3
 
     workload_dict: dict = {}
 

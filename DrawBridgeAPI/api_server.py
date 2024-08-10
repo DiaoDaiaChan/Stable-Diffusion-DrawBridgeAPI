@@ -16,7 +16,7 @@ os.environ['CIVITAI_API_TOKEN'] = 'kunkun'
 os.environ['FAL_KEY'] = 'Daisuki'
 
 from backend import Task_Handler, Backend
-from base_config import setup_logger, redis_client
+from base_config import setup_logger, redis_client, config
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -155,6 +155,12 @@ class Img2ImgRequest(BaseModel):
     # 以下为拓展
 
 
+class TaggerRequest(BaseModel):
+    image: str = '',
+    model: str = 'wd14-vit-v2'
+    threshold: float = 0.35
+
+
 @app.on_event("startup")
 def startup_event():
     threading.Thread(target=make_request).start()
@@ -238,6 +244,35 @@ async def get_models(request: Request):
     redis_resp.update(models_dict)
     redis_client.set('models', json.dumps(redis_resp))
     return api_respond
+
+
+if config.server_settings['build_in_tagger']:
+    from utils.tagger import WaifuDiffusionInterrogator
+
+    wd_instance = WaifuDiffusionInterrogator(
+        name='WaifuDiffusion',
+        repo_id='SmilingWolf/wd-v1-4-convnextv2-tagger-v2',
+        revision='v2.0',
+        model_path='model.onnx',
+        tags_path='selected_tags.csv'
+    )
+
+    wd_instance.load()
+
+
+    @app.post("/tagger/v1/interrogate")
+    async def _(request: TaggerRequest, api: Request):
+        from utils.tagger import tagger_main, wd_logger
+        data = request.model_dump()
+        caption = await asyncio.get_event_loop().run_in_executor(
+            None,
+            tagger_main,
+            data['image'],
+            data['threshold'],
+            wd_instance
+        )
+        wd_logger.info(f"打标成功,{caption}")
+        return JSONResponse(caption)
 
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])

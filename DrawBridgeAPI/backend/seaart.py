@@ -50,8 +50,8 @@ class AIDRAW(Backend):
                             continue
 
                         elif isinstance(urls, list):
+                            await self.set_backend_working_status(available=True)
                             for url in urls:
-                                await self.set_backend_working_status(available=True)
                                 self.logger.img(f"图片url: {url['url']}")
                                 self.img_url.append(url['url'])
                             return
