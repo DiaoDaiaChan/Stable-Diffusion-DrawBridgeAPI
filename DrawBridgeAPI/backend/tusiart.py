@@ -77,8 +77,8 @@ class AIDRAW(Backend):
 
             resp = await self.set_backend_working_status(get=True)
             progress = resp['idle']
-            available = resp['available']
 
+            available = resp['available']
             progress = 0.99 if progress is False else 0.0
 
             build_resp = self.format_progress_api_resp(progress, self.start_time)

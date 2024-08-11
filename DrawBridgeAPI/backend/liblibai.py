@@ -48,6 +48,8 @@ class AIDRAW(Backend):
                     else:
                         await self.set_backend_working_status(available=True)
                         for i in images:
+                            if 'porn' in i['previewPath']:
+                                raise RuntimeError("API侧检测到NSFW图片")
                             self.logger.img(f"图片url: {i['previewPath']}")
                             self.img_url.append(i['previewPath'])
                             self.comment = i['imageInfo']

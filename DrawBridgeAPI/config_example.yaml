@@ -1,89 +1,94 @@
-civitai_setting: # {"token": []}
+civitai_setting: # civitai API token
   token:
     -
   model:
     ''
   proxy:
     -
-a1111webui_setting:
-  backend_url:
+a1111webui_setting:   # sd_webui 设置
+  backend_url:  # 后端地址
     - http://127.0.0.1:7860
     - http://127.0.0.1:7861
-  name:
+  name:  # 后端备注名称
     - 后端1
     - 后端2
-  auth:
+  auth:  # 是否需要登录
     - false
     - false
-  username:
+  username:  # 用户名
     - admin
     - admin
-  password:
+  password:  # 密码
     - admin
     - admin
-  max_resolution:
+  max_resolution:  # 最大分辨率，这个功能没写，暂时不生效
     - null
     - 1572864
 fal_ai_setting: # {"token": []}
-  token:
+  token:  # 
     -
   model:
     ''
 replicate_setting: # {"token": []}
-  token:
+  token:  # https://replicate.com/black-forest-labs/flux-schnell
     -
   model:
     ''
 liblibai_setting:
-  token:
-    -
-    -
-  model:
+# https://www.liblib.art/ # 按下F12 -> 应用 -> cookies -> https://www.liblib.art -> usertoken 的值 d812c12d83c640.....
+  token:  # 
+    - d812c12d83c640...
+    - 只要token填上了也算一个后端哦
+# 模型id获取方法 https://www.liblib.art/sd 先选择喜欢的模型 先按下F12 再 生图
+# 回到开发者控制台,网络选项 -> 找到名为 image 的请求,点击 负载 ， 请求负载 找到 checkpointId
+  model:  # 模型id
     - 2332049
     - 1135059
-  model_name:
+  model_name:  # 模型名字，仅用作标记
     - "DiaoDaiaMix - 二次元风格"
     - "Colorful Anime XL 彩璃二次元XL"
-  xl:
+  xl:  # 是否为XL模型
     - false
     - true
-  flux:
+  flux:  # 是否为FLUX模型
     - false
     - false
   preference:
     - pretags:  # 内置prompt
-        1.5:
+        1.5:  #  1.5模式下的预设词条，上面为正面，下面为负面
           - ''
           - ''
-        xl:
+        xl:  # xl 同上
           - ""
           - ""
         flux:
           - ''
           - ''
-      steps: 20
+      steps: 20  # 步数
 
-    - pretags: # 内置prompt
+    - pretags:
         1.5:
           - ''
           - ''
         xl:
-          - "finely detail,(((masterpiece))),((extremely detailed CG unity 8k wallpaper)),best quality,high resolution illustration,Amazing,highres,intricate detail,best illumination,"
-          - "lowres,bad anatomy,bad hands,text,error,missing fingers,extra digit,fewer digits,cropped,worst quality,low quality,normal quality,jpeg artifacts,signature,watermark,username,blurry,artist name,"
+          - ""
+          - ""
         flux:
           - ''
           - ''
       steps: 12
-tusiart_setting:
-  token:
-    -
-  model:
+tusiart_setting:  
+# 注意，有两个必填项，一个是token，一个是referer
+# https://tusiart.com/ 
+# 按下F12 -> 应用 -> cookies -> https://tusiart.com -> ta_token_prod 的值 eyJhbGciOiJI....
+  token:  #
+    - eyJhbGciOiJI....
+  model:  # 例如 https://tusiart.com/models/756170434619145524 # 取后面的数字
     - 708770380971558251
   note:
     - 备注
-  referer:
+  referer:  # 你的用户首页! 点击右上角头像，复制链接 必填！！
     - https://tusiart.com/u/759763664390847335
-    -
 seaart_setting:
   token:
     -
@@ -98,19 +103,23 @@ yunjie_setting:
       - 移动
 
 server_settings:
+  # 重点! 需要启动的后端, 有些后端你没配置的话依然启动会导致API报错（虽然API会将它锁定，之后请求就不会到它）
+  # 怎么数呢？ 比如在这个配置文件中 civitai 的第一个token是 0 a1111 的第一个后端是 1 , 第二个是2
+  # 所以 enable_txt2img_backends: [0,1] 表示启动 civitai第一个token 和 a1111的第一个后端
+  # 再比如 enable_txt2img_backends: [3, 4, 5] 表示启动 liblib 的所有两个token 和 tusiart的第一个token
   enable_txt2img_backends: [5,6,7,8,9,10,11]
   enable_img2img_backends: [1]
 #  enable_sdapi_backends: [1]
-  redis_server:
-    - 127.0.0.1
-    - 6379
-    - null
-  enable_nsfw_check:
-    false
-  save_image:
+  redis_server:  # 必填 Redis服务器
+    - 127.0.0.1  # 地址
+    - 6379  # 端口
+    - null  # redis 密码
+  enable_nsfw_check:  # 暂时没写
+    false  
+  save_image:  # 是否直接保存图片
     true
-xiao
-backend_name_list:
+
+backend_name_list:  # 不要动！
   - civitai
   - a1111
   - falai

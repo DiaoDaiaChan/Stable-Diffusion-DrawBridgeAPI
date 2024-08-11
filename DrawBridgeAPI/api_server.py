@@ -55,7 +55,7 @@ class Txt2ImgRequest(BaseModel):
     subseed_strength: float = 0
     seed_resize_from_h: int = -1
     seed_resize_from_w: int = -1
-    sampler_name: str = None
+    sampler_name: str = "Euler"
     batch_size: int = 1
     n_iter: int = 1
     steps: int = 50
@@ -75,7 +75,7 @@ class Txt2ImgRequest(BaseModel):
     s_noise: float = 0
     override_settings: Dict[str, Any] = {}
     override_settings_restore_afterwards: bool = True
-    refiner_checkpoint: str = None
+    refiner_checkpoint: str = ""
     refiner_switch_at: int = 0
     disable_extra_networks: bool = False
     comments: Dict[str, Any] = {}
@@ -83,16 +83,16 @@ class Txt2ImgRequest(BaseModel):
     firstphase_width: int = 0
     firstphase_height: int = 0
     hr_scale: float = 2
-    hr_upscaler: str = None
+    hr_upscaler: str = ""
     hr_second_pass_steps: int = 0
     hr_resize_x: int = 0
     hr_resize_y: int = 0
-    hr_checkpoint_name: str = None
-    hr_sampler_name: str = None
+    hr_checkpoint_name: str = ""
+    hr_sampler_name: str = ""
     hr_prompt: str = ""
     hr_negative_prompt: str = ""
     sampler_index: str = "Euler"
-    script_name: str = None
+    script_name: str = ""
     script_args: List[Any] = []
     send_images: bool = True
     save_images: bool = False
@@ -108,7 +108,7 @@ class Img2ImgRequest(BaseModel):
     subseed_strength: float = 0
     seed_resize_from_h: int = -1
     seed_resize_from_w: int = -1
-    sampler_name: str = None
+    sampler_name: str = "Euler"
     batch_size: int = 1
     n_iter: int = 1
     steps: int = 50
@@ -128,11 +128,11 @@ class Img2ImgRequest(BaseModel):
     s_noise: float = 0
     override_settings: Dict[str, Any] = {}
     override_settings_restore_afterwards: bool = True
-    refiner_checkpoint: str = None
+    refiner_checkpoint: str = ""
     refiner_switch_at: int = 0
     disable_extra_networks: bool = False
     comments: Dict[str, Any] = {}
-    init_images: List[str] = [None]
+    init_images: List[str] = [""]
     resize_mode: int = 0
     image_cfg_scale: float = 0
     mask: str = None
@@ -144,10 +144,10 @@ class Img2ImgRequest(BaseModel):
     inpaint_full_res_padding: int = 0
     inpainting_mask_invert: int = 0
     initial_noise_multiplier: float = 0
-    latent_mask: str = None
+    latent_mask: str = ""
     sampler_index: str = "Euler"
     include_init_images: bool = False
-    script_name: str = None
+    script_name: str = ""
     script_args: List[Any] = []
     send_images: bool = True
     save_images: bool = False
@@ -221,7 +221,6 @@ async def img2img(request: Img2ImgRequest, api: Request):
 
 @app.get("/sdapi/v1/sd-models")
 async def get_models(request: Request):
-
     task_list = []
     path = '/sdapi/v1/sd-models'
 
@@ -273,6 +272,11 @@ if config.server_settings['build_in_tagger']:
         )
         wd_logger.info(f"打标成功,{caption}")
         return JSONResponse(caption)
+
+@app.post('/sdapi/v1/prompt-styles')
+async def _(request):
+    pass
+
 
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])

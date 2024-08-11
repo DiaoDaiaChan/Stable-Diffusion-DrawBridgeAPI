@@ -596,7 +596,11 @@ class Backend:
 
                     response = await http_request(method, target_url, headers, params, content, False)
 
-                    resp = response.json()
+                    try:
+                        resp = response.json()
+                    except json.JSONDecodeError:
+                        self.logger.error(str(response.text))
+                        raise RuntimeError('后端返回错误')
 
                     self.result = JSONResponse(content=resp, status_code=response.status_code)
                 else:
@@ -655,15 +659,16 @@ class Backend:
         默认为a1111webui posting
         :return:
         """
+        await self.post_request()
 
-        self.post_event = asyncio.Event()
-        post_task = asyncio.create_task(self.post_request())
-        # 此处为显示进度条
-        while not self.post_event.is_set():
-            await self.show_progress_bar()
-            await asyncio.sleep(2)
-
-        ok = await post_task
+        # self.post_event = asyncio.Event()
+        # post_task = asyncio.create_task(self.post_request())
+        # # 此处为显示进度条
+        # while not self.post_event.is_set():
+        #     await self.show_progress_bar()
+        #     await asyncio.sleep(2)
+        #
+        # ok = await post_task
 
     async def download_img(self, image_list=None):
         """
