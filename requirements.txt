@@ -1,6 +1,7 @@
 aiohttp
 aiofiles
 Pillow==10.4.0
+civitai-py
 civitai
 colorama
 fastapi
