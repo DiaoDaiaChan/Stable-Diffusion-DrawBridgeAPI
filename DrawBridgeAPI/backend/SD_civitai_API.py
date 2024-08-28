@@ -1,13 +1,11 @@
 import traceback
 import piexif
-import aiohttp
 import os
 import civitai
 
 from io import BytesIO
 
 from .base import Backend
-
 
 class AIDRAW(Backend):
 
@@ -67,17 +65,20 @@ class AIDRAW(Backend):
     async def check_backend_usability(self):
 
         self.headers['Authorization'] = f"Bearer {self.token}"
-        async with aiohttp.ClientSession(headers=self.headers) as session:
-            async with session.get(
-                    'https://civitai.com/api/v1/models',
-                    proxy=self.config.civitai_setting['proxy'][self.count]
-            ) as resp:
-                if resp.status != 200:
-                    self.fail_on_login = True
-                    return False
-                else:
-                    resp_json = await resp.json()
-                    return True, (resp_json, resp.status)
+        response = await self.http_request(
+            method="GET",
+            target_url='https://civitai.com/api/v1/models',
+            headers=self.headers,
+            params=None,
+            format=True
+        )
+
+        if isinstance(response, dict) and 'error' in response:
+            self.fail_on_login = True
+            return False
+        else:
+            resp_json = response
+            return True, (resp_json, 200)
 
     async def formating_to_sd_style(self):
 
@@ -88,24 +89,6 @@ class AIDRAW(Backend):
     async def posting(self):
 
         self.logger.info(f"开始使用{self.token}获取图片")
-
-        # class CustomCivitai(Civitai):
-        #     def __init__(self, api_token, env="prod"):
-        #         self.api_token = api_token
-        #         if not self.api_token:
-        #             raise ValueError("API token not provided.")
-        #
-        #         self.base_path = "https://orchestration-dev.civitai.com" if env == "dev" else "https://orchestration.civitai.com"
-        #         self.verify = True
-        #         self.headers = {
-        #             "Authorization": f"Bearer {self.api_token}",
-        #             "Content-Type": "application/json"
-        #         }
-        #
-        #         self.image = self.Image(self)
-        #         self.jobs = self.Jobs(self)
-        #
-        # civitai_ = CustomCivitai(api_token=self.token)
 
         os.environ['CIVITAI_API_TOKEN'] = self.token
         os.environ['HTTP_PROXY'] = self.config.civitai_setting['proxy'][self.count]

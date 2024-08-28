@@ -2,7 +2,6 @@ import yaml as yaml_
 import redis
 import json
 import logging
-import asyncio
 
 from pydantic_settings import BaseSettings
 from pathlib import Path
@@ -122,6 +121,7 @@ class Config(BaseSettings):
     tusiart_setting: dict = empty_dict
     seaart_setting: dict = empty_dict
     yunjie_setting: dict = empty_dict
+    comfyui_setting: dict = empty_dict
 
     civitai: list or None = []
     a1111webui: list = []
@@ -131,6 +131,7 @@ class Config(BaseSettings):
     tusiart: list = []
     seaart: list = []
     yunjie: list = []
+    comfyui: list = []
 
     civitai_name: dict = {}
     a1111webui_name: dict = {}
@@ -140,6 +141,7 @@ class Config(BaseSettings):
     tusiart_name: dict = {}
     seaart_name: dict = {}
     yunjie_name: dict = {}
+    comfyui_name: dict = {}
 
     server_settings: dict = {}
     retry_times: int = 3
@@ -194,6 +196,7 @@ config.liblibai = config.liblibai_setting['token']
 config.tusiart = config.tusiart_setting['token']
 config.seaart = config.seaart_setting['token']
 config.yunjie = config.yunjie_setting['token']
+config.comfyui = config.comfyui_setting
 
 sources_list = [
     (config.civitai, 0, config.civitai_name),
@@ -204,6 +207,7 @@ sources_list = [
     (config.tusiart, 5, config.tusiart_name),
     (config.seaart, 6, config.seaart_name),
     (config.yunjie, 7, config.yunjie_name),
+    (config.comfyui, 8, config.comfyui_name),
 ]
 
 
@@ -213,6 +217,11 @@ def process_items(config, items, backend_index, name_dict):
             key = f"{config.backend_name_list[backend_index]}-{items['name'][i]}"
             config.workload_dict[key] = config.base_workload_dict
             name_dict[f"a1111-{items['name'][i]}"] = items['backend_url'][i]
+    elif backend_index == 8:
+        for i in range(len(items['name'])):
+            key = f"{config.backend_name_list[backend_index]}-{items['name'][i]}"
+            config.workload_dict[key] = config.base_workload_dict
+            name_dict[f"comfyui-{items['name'][i]}"] = items['backend_url'][i]
     else:
         for n in items:
             key = f"{config.backend_name_list[backend_index]}-{n}"

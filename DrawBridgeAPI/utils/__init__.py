@@ -1,6 +1,7 @@
 import httpx
 import json
 from fastapi.exceptions import HTTPException
+from utils import exceptions
 
 
 async def http_request(

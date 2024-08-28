@@ -2,8 +2,6 @@ import asyncio
 import json
 import traceback
 
-import aiohttp
-
 from .base import Backend
 
 
@@ -25,36 +23,40 @@ class AIDRAW(Backend):
         self.logger.info(f"{id_} 开始请求")
         for i in range(60):
             await asyncio.sleep(5)
-            async with aiohttp.ClientSession(headers=self.headers) as session:
-                async with session.post(
-                        url="https://www.yunjie.art/rayvision/aigc/customer/task/progress",
-                        data=json.dumps({"taskId": id_})) as resp:
 
-                    if resp.status != 200:
-                        raise RuntimeError(f"请求失败，状态码: {resp.status}")
+            data = json.dumps({"taskId": id_})
+            response = await self.http_request(
+                method="POST",
+                target_url="https://www.yunjie.art/rayvision/aigc/customer/task/progress",
+                headers=self.headers,
+                content=data
+            )
 
-                    resp_json = await resp.json()
-                    if resp_json['code'] == "Account.Token.Expired":
-                        error_text = f"""
-                        后端：{self.config.yunjie_setting['note'][self.count]} token过期。
-                        请前往https://www.yunjie.art/ 登录重新获取token
-                        """
-                        self.logger.warning("token过期")
-                        raise RuntimeError(error_text)
-                    items = resp_json.get('data', {}).get('data', [])
-                    self.logger.info(f"第{i + 1}次心跳，未返回结果")
+            if isinstance(response, dict) and 'error' in response:
+                raise RuntimeError(f"请求失败，错误信息: {response.get('details')}")
+            else:
+                resp_json = response
+                if resp_json['code'] == "Account.Token.Expired":
+                    error_text = f"""
+                    后端：{self.config.yunjie_setting['note'][self.count]} token过期。
+                    请前往https://www.yunjie.art/ 登录重新获取token
+                    """
+                    self.logger.warning("token过期")
+                    raise RuntimeError(error_text)
+                items = resp_json.get('data', {}).get('data', [])
+                self.logger.info(f"第{i + 1}次心跳，未返回结果")
 
-                    if not items:
-                        continue
+                if not items:
+                    continue
 
-                    for item in items:
-                        await self.set_backend_working_status(available=True)
-                        url = item.get("url")
+                for item in items:
+                    await self.set_backend_working_status(available=True)
+                    url = item.get("url")
 
-                        if url:
-                            self.logger.img(f"图片url: {url}")
-                            self.img_url.append(url)
-                            return
+                    if url:
+                        self.logger.img(f"图片url: {url}")
+                        self.img_url.append(url)
+                        return
 
         raise RuntimeError(f"任务 {id_} 在60次心跳后仍未完成")
 
@@ -132,17 +134,21 @@ class AIDRAW(Backend):
         self.headers.update(new_headers)
 
         await self.set_backend_working_status(available=False)
-        async with aiohttp.ClientSession(headers=self.headers) as session:
-            async with session.post(
-                    url="https://www.yunjie.art/rayvision/aigc/customer/task/imageGen",
-                    data=json.dumps(input_)
-            ) as resp:
-                if resp.status not in [200, 201]:
-                    pass
-                else:
-                    task = await resp.json()
-                    task_id = task['data']['taskId']
-                    await self.heart_beat(task_id)
+        data = json.dumps(input_)
 
-        await self.formating_to_sd_style()
+        # 使用 http_request 函数发送 POST 请求
+        response = await self.http_request(
+            method="POST",
+            target_url="https://www.yunjie.art/rayvision/aigc/customer/task/imageGen",
+            headers=self.headers,
+            content=data
+        )
+
+        if response.get("error", None):
+            self.logger.error(f"请求失败，错误信息: {response.get('details')}")
+        else:
+            task = response
+            task_id = task['data']['taskId']
+            await self.heart_beat(task_id)
+            await self.formating_to_sd_style()
 

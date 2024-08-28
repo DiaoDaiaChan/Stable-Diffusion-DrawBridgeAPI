@@ -1,0 +1,9 @@
+torch
+numpy
+pillow
+transformers>=4.43.3
+huggingface_hub
+protobuf
+bitsandbytes
+sentencepiece
+accelerate

@@ -3,6 +3,7 @@ import random
 import json
 
 from tqdm import tqdm
+from pathlib import Path
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from colorama import Fore, Style
@@ -18,10 +19,11 @@ from .liblibai import AIDRAW as AIDRAW5
 from .tusiart import AIDRAW as AIDRAW6
 from .seaart import AIDRAW as AIDRAW7
 from .yunjie import AIDRAW as AIDRAW8
+from .comfyui import AIDRAW as AIDRAW9
 from .base import Backend
 
 
-class Base_Handler:
+class BaseHandler:
 
     def __init__(
         self,
@@ -37,6 +39,7 @@ class Base_Handler:
         self.config = config
         self.all_task_list = list(range(len(list(config.name_url[0].keys()))))
         self.enable_backend: dict = {}
+        self.comfyui_task: str = 'sdbase_txt2img'
 
     async def get_enable_task(
         self,
@@ -55,7 +58,8 @@ class Base_Handler:
             self.get_liblibai_task(),
             self.get_tusiart_task(),
             self.get_seaart_task(),
-            self.get_yunjie_task()
+            self.get_yunjie_task(),
+            self.get_comfyui_task()
         ]
 
         all_backend_instance = await asyncio.gather(*tasks)
@@ -163,8 +167,25 @@ class Base_Handler:
 
         return instance_list
 
+    async def get_comfyui_task(self):
 
-class TXT2IMG_Handler(Base_Handler):
+        instance_list = []
+        counter = 0
+        for i in config.comfyui['name']:
+            aidraw_instance = AIDRAW9(
+                count=counter,
+                payload=self.payload,
+                request=self.request,
+                path=self.path,
+                comfyui_api_json=self.comfyui_task
+            )
+            counter += 1
+            instance_list.append(aidraw_instance)
+
+        return instance_list
+
+
+class TXT2IMGHandler(BaseHandler):
 
     async def get_all_instance(self) -> tuple[list[Backend], dict]:
         # 手动选择启动的后端
@@ -179,7 +200,7 @@ class TXT2IMG_Handler(Base_Handler):
         return self.instance_list, self.enable_backend
 
 
-class IMG2IMG2_Handler(Base_Handler):
+class IMG2IMGHandler(BaseHandler):
 
     async def get_all_instance(self) -> tuple[list[Backend], dict]:
         # 手动选择启动的后端
@@ -194,7 +215,7 @@ class IMG2IMG2_Handler(Base_Handler):
         return self.instance_list, self.enable_backend
 
 
-class A1111Webui_Handler(Base_Handler):
+class A1111WebuiHandler(BaseHandler):
 
     async def get_all_instance(self) -> tuple[list[Backend], dict]:
 
@@ -203,7 +224,16 @@ class A1111Webui_Handler(Base_Handler):
         return self.instance_list, self.enable_backend
 
 
-class Task_Handler:
+class ComfyuiHandler(BaseHandler):
+
+    async def get_all_instance(self) -> tuple[list[Backend], dict]:
+
+        await self.get_enable_task([1])
+
+        return self.instance_list, self.enable_backend
+
+
+class TaskHandler:
 
     def __init__(
         self,
@@ -213,7 +243,8 @@ class Task_Handler:
         select_backend: int = None,
         reutrn_instance: bool = False,
         model_to_backend: str = None,
-        disable_loadbalance: bool = False
+        disable_loadbalance: bool = False,
+        comfyui_json: Path = None
     ):
         self.payload = payload
         self.instance_list = []
@@ -226,7 +257,8 @@ class Task_Handler:
         self.model_to_backend = model_to_backend
         self.disable_loadbalance = disable_loadbalance
 
-    def get_backend_name(self, model_name) -> str:
+    @staticmethod
+    def get_backend_name(model_name) -> str:
         all_model: bytes = redis_client.get('models')
         all_model: dict = json.loads(all_model.decode('utf-8'))
         for key, models in all_model.items():
@@ -235,26 +267,26 @@ class Task_Handler:
                     if model.get("title") == model_name:
                         return key
 
-    def get_backend_index(self, mapping_dict, key_to_find) -> int:
+    @staticmethod
+    def get_backend_index(mapping_dict, key_to_find) -> int:
         keys = list(mapping_dict.keys())
         if key_to_find in keys:
             return keys.index(key_to_find)
         return None
 
-
     async def txt2img(self):
-        self.instance_list, self.enable_backend = await TXT2IMG_Handler(self.payload).get_all_instance()
+        self.instance_list, self.enable_backend = await TXT2IMGHandler(self.payload).get_all_instance()
         await self.choice_backend()
         return self.result
 
     async def img2img(self):
-        self.instance_list, self.enable_backend = await IMG2IMG2_Handler(self.payload).get_all_instance()
+        self.instance_list, self.enable_backend = await IMG2IMGHandler(self.payload).get_all_instance()
         await self.choice_backend()
         return self.result
 
     async def sd_api(self) -> JSONResponse or list[Backend]:
 
-        self.instance_list, self.enable_backend = await A1111Webui_Handler(
+        self.instance_list, self.enable_backend = await A1111WebuiHandler(
             self.payload,
             self.request,
             self.path
@@ -264,6 +296,7 @@ class Task_Handler:
         return self.result
 
     async def choice_backend(self):
+
         if self.disable_loadbalance:
             return
         backend_url_dict = self.enable_backend
@@ -289,7 +322,8 @@ class Task_Handler:
             task = i.get_backend_working_progress()
             tasks.append(task)
         # 获取api队列状态
-        if self.model_to_backend:
+        key = self.get_backend_name(self.model_to_backend)
+        if self.model_to_backend and key is not None:
 
             key = self.get_backend_name(self.model_to_backend)
             backend_index = self.get_backend_index(backend_url_dict, key)
@@ -336,29 +370,26 @@ class Task_Handler:
                             bar_format=bar_format
                     ) as pbar:
                         pbar.update(progress)
-
+            if len(normal_backend) == 0:
+                raise RuntimeError("没有可用后端")
             if is_avaiable == 0:
                 n = -1
                 y = 0
                 normal_backend = list(status_dict.keys())
                 logger.info("没有空闲后端")
-                if len(normal_backend) == 0:
-                    raise RuntimeError("没有可用后端")
-                else:
-                    eta_list = list(status_dict.values())
-                    for t, b in zip(eta_list, normal_backend):
-                        if int(t) < defult_eta:
-                            y += 1
-                            ava_url = b
-                            logger.info(f"已选择后端{reverse_dict[ava_url][:24]}")
-                            break
-                        else:
-                            y += 0
-                    if y == 0:
-                        reverse_sta_dict = {value: key for key, value in status_dict.items()}
-                        eta_list.sort()
-                        ava_url = reverse_sta_dict[eta_list[0]]
-
+                eta_list = list(status_dict.values())
+                for t, b in zip(eta_list, normal_backend):
+                    if int(t) < defult_eta:
+                        y += 1
+                        ava_url = b
+                        logger.info(f"已选择后端{reverse_dict[ava_url][:24]}")
+                        break
+                    else:
+                        y += 0
+                if y == 0:
+                    reverse_sta_dict = {value: key for key, value in status_dict.items()}
+                    eta_list.sort()
+                    ava_url = reverse_sta_dict[eta_list[0]]
             if len(idle_backend) >= 1:
                 ava_url = random.choice(idle_backend)
 

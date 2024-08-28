@@ -28,32 +28,36 @@ class AIDRAW(Backend):
     async def heart_beat(self, id_):
         self.logger.info(f"{id_}开始请求")
         for i in range(60):
-            async with aiohttp.ClientSession(headers=self.headers) as session:
-                async with session.post(
-                        url=f"https://liblib-api.vibrou.com/gateway/sd-api/generate/progress/msg/v3/{id_}",
-                        data=json.dumps({"flag": 0})) as resp:
 
-                    if resp.status != 200:
-                        raise RuntimeError
-                    resp_json = await resp.json()
-                    if resp_json['code'] != 0 or resp_json['data']['statusMsg'] == '执行异常':
-                        raise RuntimeError('服务器返回错误')
+            response = await self.http_request(
+                method="POST",
+                target_url=f"https://liblib-api.vibrou.com/gateway/sd-api/generate/progress/msg/v3/{id_}",
+                headers=self.headers,
+                content=json.dumps({"flag": 0})
+            )
 
-                    images = resp_json['data']['images']
+            # 检查请求结果并处理
+            if response.get('error') == "error":
+                self.logger.warning(f"Failed to request: {response}")
+                raise RuntimeError('服务器返回错误')
+            if response['code'] != 0 or response['data']['statusMsg'] == '执行异常':
+                raise RuntimeError('服务器返回错误')
 
-                    if images is None:
-                        self.logger.info(f"第{i+1}次心跳，未返回结果")
-                        await asyncio.sleep(5)
-                        continue
-                    else:
-                        await self.set_backend_working_status(available=True)
-                        for i in images:
-                            if 'porn' in i['previewPath']:
-                                raise RuntimeError("API侧检测到NSFW图片")
-                            self.logger.img(f"图片url: {i['previewPath']}")
-                            self.img_url.append(i['previewPath'])
-                            self.comment = i['imageInfo']
-                        break
+            images = response['data']['images']
+
+            if images is None:
+                self.logger.info(f"第{i+1}次心跳，未返回结果")
+                await asyncio.sleep(5)
+                continue
+            else:
+                await self.set_backend_working_status(available=True)
+                for i in images:
+                    if 'porn' in i['previewPath']:
+                        raise RuntimeError("API侧检测到NSFW图片")
+                    self.logger.img(f"图片url: {i['previewPath']}")
+                    self.img_url.append(i['previewPath'])
+                    self.comment = i['imageInfo']
+                break
 
     async def update_progress(self):
         # 覆写函数
@@ -191,20 +195,23 @@ class AIDRAW(Backend):
         self.headers.update(new_headers)
 
         await self.set_backend_working_status(available=False)
-        async with aiohttp.ClientSession(headers=self.headers) as session:
-            async with session.post(
-                    url="https://liblib-api.vibrou.com/gateway/sd-api/generate/image",
-                    data=json.dumps(input_)
-            ) as resp:
-                if resp.status not in [200, 201]:
-                    pass
-                else:
-                    task = await resp.json()
-                    if task['msg'] == 'Insufficient power':
-                        self.logger.warning('费用不足!')
-                    self.logger.info(f"API返回{task}")
-                    task_id = task['data']
-                    await self.heart_beat(task_id)
+        response = await self.http_request(
+            method="POST",
+            target_url="https://liblib-api.vibrou.com/gateway/sd-api/generate/image",
+            headers=self.headers,
+            content=json.dumps(input_)
+        )
+
+        # 检查请求结果
+        if response.get('error') == "error":
+            self.logger.warning(f"Failed to request: {response}")
+        else:
+            task = response
+            if task['msg'] == 'Insufficient power':
+                self.logger.warning('费用不足!')
+            self.logger.info(f"API返回{task}")
+            task_id = task['data']
+            await self.heart_beat(task_id)
 
         await self.formating_to_sd_style()
 

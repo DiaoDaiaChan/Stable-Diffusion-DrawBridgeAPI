@@ -2,8 +2,6 @@ import asyncio
 import json
 import traceback
 
-import aiohttp
-
 from .base import Backend
 
 
@@ -23,38 +21,39 @@ class AIDRAW(Backend):
 
     async def heart_beat(self, id_):
         self.logger.info(f"{id_} 开始请求")
+        data = json.dumps({"task_ids": [id_]})
         for i in range(60):
-            async with aiohttp.ClientSession(headers=self.headers) as session:
-                async with session.post(
-                        url="https://www.seaart.me/api/v1/task/batch-progress",
-                        data=json.dumps({"task_ids": [id_]})) as resp:
+            response = await self.http_request(
+                method="POST",
+                target_url="https://www.seaart.me/api/v1/task/batch-progress",
+                headers=self.headers,
+                content=data
+            )
 
-                    if resp.status != 200:
-                        raise RuntimeError(f"请求失败，状态码: {resp.status}")
+            if isinstance(response, dict) and 'error' in response:
+                raise RuntimeError(f"请求失败，错误信息: {response.get('details')}")
+            else:
+                items = response.get('data', {}).get('items', [])
 
-                    resp_json = await resp.json()
+                if not items:
+                    self.logger.info(f"第{i + 1}次心跳，未返回结果")
+                    await asyncio.sleep(5)
+                    continue
 
-                    items = resp_json.get('data', {}).get('items', [])
+                for item in items:
+                    urls = item.get("img_uris")
 
-                    if not items:
+                    if urls is None:
                         self.logger.info(f"第{i + 1}次心跳，未返回结果")
                         await asyncio.sleep(5)
                         continue
 
-                    for item in items:
-                        urls = item.get("img_uris")
-
-                        if urls is None:
-                            self.logger.info(f"第{i + 1}次心跳，未返回结果")
-                            await asyncio.sleep(5)
-                            continue
-
-                        elif isinstance(urls, list):
-                            await self.set_backend_working_status(available=True)
-                            for url in urls:
-                                self.logger.img(f"图片url: {url['url']}")
-                                self.img_url.append(url['url'])
-                            return
+                    elif isinstance(urls, list):
+                        await self.set_backend_working_status(available=True)
+                        for url in urls:
+                            self.logger.img(f"图片url: {url['url']}")
+                            self.img_url.append(url['url'])
+                        return
 
         raise RuntimeError(f"任务 {id_} 在60次心跳后仍未完成")
 
@@ -134,20 +133,26 @@ class AIDRAW(Backend):
             "Accept": "application/json, text/plain, */*",
             "Token": self.token
         }
+
         self.headers.update(new_headers)
 
         await self.set_backend_working_status(available=False)
-        async with aiohttp.ClientSession(headers=self.headers) as session:
-            async with session.post(
-                    url="https://www.seaart.me/api/v1/task/create",
-                    data=json.dumps(input_)
-            ) as resp:
-                if resp.status not in [200, 201]:
-                    pass
-                else:
-                    task = await resp.json()
-                    task_id = task['data']['id']
-                    await self.heart_beat(task_id)
+        data = json.dumps(input_)
+        response = await self.http_request(
+            method="POST",
+            target_url="https://www.seaart.me/api/v1/task/create",
+            headers=self.headers,
+            content=data
+        )
+
+        if isinstance(response, dict) and 'error' in response:
+            self.logger.warning(f"{response.get('details')}")
+        else:
+            task = response
+            task_id = task.get('data', {}).get('id')
+
+            if task_id:
+                await self.heart_beat(task_id)
 
         await self.formating_to_sd_style()
 

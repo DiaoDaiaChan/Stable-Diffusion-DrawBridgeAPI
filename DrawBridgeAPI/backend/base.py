@@ -1,23 +1,25 @@
-import aiohttp
+import random
+
 import aiofiles
 import base64
 import json
 import asyncio
 import traceback
 import time
+import httpx
 
 from PIL import Image
 from tqdm import tqdm
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import HTTPException
 from io import BytesIO
 from pathlib import Path
 from datetime import datetime
 
 from base_config import setup_logger
 from base_config import redis_client, config
-from utils import http_request
-
+from utils import http_request, exceptions
 
 class Backend:
 
@@ -31,18 +33,20 @@ class Backend:
         input_img: str = None,
         request: Request = None,
         path: str = None,
+        comfyui_api_json: str = None,
         **kwargs,
     ):
 
         self.tags: str = payload.get('prompt', '1girl')
         self.ntags: str = payload.get('negative_prompt', '')
-        self.seed: int = payload.get('seed', -1)
+        self.seed: int = payload.get('seed', random.randint(0, 4294967295))
         self.steps: int = payload.get('steps', 20)
         self.scale: float = payload.get('cfg_scale', 7.0)
         self.width: int = payload.get('width', 512)
         self.height: int = payload.get('height', 512)
-        self.sampler: str = payload.get('sampler_name', "Euler")
+        self.sampler: str = payload.get('sampler_name', "euler")
         self.restore_faces: bool = payload.get('restore_faces', False)
+        self.scheduler: str = payload.get('scheduler', 'normal')
 
         self.batch_size: int = payload.get('batch_size', 1)
         self.batch_count: int = payload.get('n_iter', 1)
@@ -66,6 +70,9 @@ class Backend:
         self.model_id = '20204'
         self.model_hash = "c7352c5d2f"
         self.model_list: list = []
+        self.model_path = "models\\1053-S.ckpt"
+
+        self.comfyui_api_json = comfyui_api_json
 
         self.result: list = []
         self.time = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -112,6 +119,8 @@ class Backend:
 
         self.build_info: dict = None
         self.build_respond: dict = None
+
+        self.DBAPIExceptions = exceptions.DrawBridgeAPIException
 
     def format_api_respond(self):
 
@@ -243,6 +252,8 @@ class Backend:
         :param img_data: 图片的字节数据
         :param save_path: 保存图片的完整路径
         """
+        if "view?filename=" in str(save_path):
+            save_path = Path(str(save_path).replace("view?filename=", ""))
         async with aiofiles.open(save_path, 'wb') as img_file:
             await img_file.write(img_data)
 
@@ -557,6 +568,37 @@ class Backend:
 
         return build_resp
 
+    @staticmethod
+    async def http_request(
+            method,
+            target_url,
+            headers=None,
+            params=None,
+            content=None,
+            format=True,
+            timeout=300
+    ) -> json or httpx.Response:
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.request(
+                    method,
+                    target_url,
+                    headers=headers,
+                    params=params,
+                    content=content,
+                    timeout=timeout
+                )
+                response.raise_for_status()
+            except httpx.RequestError as e:
+
+                return {"error": "Request error", "details": traceback.format_exc()}
+            except httpx.HTTPStatusError as e:
+                return {"error": "HTTP error", "status_code": e.response.status_code, "details": traceback.format_exc()}
+            if format:
+                return response.json()
+            else:
+                return response
+
     def repeat(self, input_):
         # 使用列表推导式生成重复的tag列表
         repeated_ = [input_ for _ in range(self.total_img_count)]
@@ -631,23 +673,28 @@ class Backend:
             if self.input_img:
                 post_api = f"{self.backend_url}/sdapi/v1/img2img"
 
-            async with aiohttp.ClientSession(
-                    headers=self.headers,
-                    timeout=aiohttp.ClientTimeout(total=1800)
-            ) as session:
-                # 向服务器发送请求
-                async with session.post(post_api, json=self.payload) as resp:
-                    resp_dict = json.loads(await resp.text())
-                    if resp.status not in [200, 201]:
-                        self.post_event.is_set()
-                        self.logger.error(resp_dict)
-                        if resp_dict["error"] == "OutOfMemoryError":
-                            self.logger.info("检测到爆显存，执行自动模型释放并加载")
-                            await self.unload_and_reload(self.backend_url)
-                    else:
-                        self.result = resp_dict
-                        self.logger.info(f"获取到返回图片，正在处理")
-                        self.post_event.set()
+            response = await self.http_request(
+                method="POST",
+                target_url=post_api,
+                headers=self.headers,
+                content=json.dumps(self.payload),
+                format=False,
+
+            )
+
+            if isinstance(response, httpx.Response):
+                resp_dict = response.json()
+
+                if response.status_code not in [200, 201]:
+                    self.logger.error(resp_dict)
+                    if resp_dict.get("error") == "OutOfMemoryError":
+                        self.logger.info("检测到爆显存，执行自动模型释放并加载")
+                        await self.unload_and_reload(self.backend_url)
+                else:
+                    self.result = resp_dict
+                    self.logger.info("获取到返回图片，正在处理")
+            else:
+                self.logger.error(f"请求失败，错误信息: {response.get('details')}")
             return True
 
         except:
@@ -682,22 +729,28 @@ class Backend:
         save_path.mkdir(parents=True, exist_ok=True)  # 自动创建目录
 
         for url in self.img_url:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    if response.status == 200:
-                        img_data = await response.read()
-                        self.logger.info("图片下载成功")
+            response = await self.http_request(
+                method="GET",
+                target_url=url,
+                headers=None,
+                format=False
+            )
 
-                        # 保存图片数据
-                        img_filename = save_path / Path(url).name
-                        await self.run_later(self.save_image(img_data, img_filename), 1)
+            if isinstance(response, httpx.Response):
+                if response.status_code == 200:
+                    img_data = response.read()
+                    self.logger.info("图片下载成功")
 
-                        # 处理图片数据
-                        self.img.append(base64.b64encode(img_data).decode('utf-8'))
-                        self.img_btyes.append(img_data)
-                    else:
-                        self.logger.error(f"图片下载失败！{response.status}")
-                        raise ConnectionError("图片下载失败")
+                    img_filename = save_path / Path(url).name
+                    await self.run_later(self.save_image(img_data, img_filename), 1)
+
+                    self.img.append(base64.b64encode(img_data).decode('utf-8'))
+                    self.img_btyes.append(img_data)
+                else:
+                    self.logger.error(f"图片下载失败！状态码: {response.status_code}")
+                    raise ConnectionError("图片下载失败")
+            else:
+                self.logger.error(f"请求失败，错误信息: {response.get('details')}")
 
     async def unload_and_reload(self, backend_url=None):
         """
@@ -705,15 +758,35 @@ class Backend:
         :param backend_url: 后端url地址
         :return:
         """
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url=f"{backend_url}/sdapi/v1/unload-checkpoint") as resp:
-                if resp.status not in [200, 201]:
-                    self.logger.error(f"释放模型失败，可能是webui版本太旧，未支持此API，错误:{await resp.text()}")
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url=f"{backend_url}/sdapi/v1/reload-checkpoint") as resp:
-                if resp.status not in [200, 201]:
-                    self.logger.error(f"重载模型失败，错误:{await resp.text()}")
+        # 释放模型
+        response = await self.http_request(
+            method="POST",
+            target_url=f"{backend_url}/sdapi/v1/unload-checkpoint",
+            headers=None
+        )
+
+        if isinstance(response, httpx.Response):
+            if response.status_code not in [200, 201]:
+                error_message = await response.text()
+                self.logger.error(f"释放模型失败，可能是webui版本太旧，未支持此API，错误: {error_message}")
+        else:
+            self.logger.error(f"请求失败，错误信息: {response.get('details')}")
+
+        # 重载模型
+        response = await self.http_request(
+            method="POST",
+            target_url=f"{backend_url}/sdapi/v1/reload-checkpoint",
+            headers=None
+        )
+
+        if isinstance(response, httpx.Response):
+            if response.status_code not in [200, 201]:
+                error_message = await response.text()
+                self.logger.error(f"重载模型失败，错误: {error_message}")
+            else:
                 self.logger.info("重载模型成功")
+        else:
+            self.logger.error(f"请求失败，错误信息: {response.get('details')}")
 
     async def get_backend_status(self):
         """
@@ -746,10 +819,22 @@ class Backend:
         :return:
         """
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url=f"{self.backend_url}/sdapi/v1/progress") as resp:
-                    resp_json = await resp.json()
-                    return resp_json["progress"], resp_json["eta_relative"]
+            response = await self.http_request(
+                method="GET",
+                target_url=f"{self.backend_url}/sdapi/v1/progress",
+                headers=None
+            )
+
+            if isinstance(response, httpx.Response):
+                if response.status_code == 200:
+                    resp_json = response.json()
+                    return resp_json.get("progress"), resp_json.get("eta_relative")
+                else:
+                    self.logger.error(f"获取进度失败，状态码: {response.status_code}")
+                    raise RuntimeError(f"获取进度失败，状态码: {response.status_code}")
+            else:
+                self.logger.error(f"请求失败，错误信息: {response.get('details')}")
+                raise RuntimeError(f"请求失败，错误信息: {response.get('details')}")
         except:
             traceback.print_exc()
             return 0.404
@@ -791,15 +876,6 @@ class Backend:
         backend_workload[self.workload_name] = current_backend_workload
 
         self.redis_client.set(f"workload", json.dumps(backend_workload))
-        #
-        # elif redis_key == 'models':
-        #     models: bytes = self.redis_client.get(redis_key)
-        #     models: dict = json.loads(models.decode('utf-8'))
-        #     models[self.workload_name] = self.model_list
-        #     rp = self.redis_client.pipeline()
-        #     self.redis_client.set()
-        #     current_backend_workload = models.get(self.workload_name)
-        #     current_backend_workload
 
     async def get_models(self) -> dict:
 

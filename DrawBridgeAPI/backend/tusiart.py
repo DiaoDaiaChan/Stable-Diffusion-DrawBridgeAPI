@@ -2,8 +2,6 @@ import asyncio
 import json
 import traceback
 
-import aiohttp
-
 from .base import Backend
 
 
@@ -25,46 +23,46 @@ class AIDRAW(Backend):
         self.logger.info(f"{id_}开始请求")
         self.headers['referer'] = "https://tusiart.com/models"
         del self.headers['sec-ch-ua']
+
         for i in range(60):
             await asyncio.sleep(5)
             self.logger.info(f"第{i + 1}次心跳")
-            async with aiohttp.ClientSession(headers=self.headers) as session:
-                async with session.get(
-                        url='https://api.tusiart.cn/works/v1/works/tasks?size=20&cursor=0&returnAllTask=true'
-                ) as resp:
+            response = await self.http_request(
+                method="GET",
+                target_url='https://api.tusiart.cn/works/v1/works/tasks?size=20&cursor=0&returnAllTask=true',
+                headers=self.headers
+            )
 
-                    if resp.status != 200:
-                        raise RuntimeError(f"Request failed with status {resp.status}")
+            if isinstance(response, dict) and 'error' in response:
+                raise RuntimeError(f"Request failed with error: {response.get('details')}")
+            else:
+                resp_json = response
+                all_tasks = resp_json['data']['tasks']
+                task_found = False
+                for task in all_tasks:
+                    if task['taskId'] == id_:
+                        task_found = True
+                        if task['status'] == 'WAITING':
+                            break
+                        elif task['status'] == 'FINISH':
+                            matched = False
+                            for img in task['items']:
+                                if 'workspace.tusiassets.com' in img['url']:
+                                    self.logger.img(f"图片url: {img['url']}")
+                                    self.img_url.append(img['url'])
+                                    matched = True
 
-                    resp_json = await resp.json()
-
-                    all_tasks = resp_json['data']['tasks']
-
-                    task_found = False
-                    for task in all_tasks:
-                        if task['taskId'] == id_:
-                            task_found = True
-                            if task['status'] == 'WAITING':
+                            if matched:
+                                await self.set_backend_working_status(available=True)
+                                return
+                            else:
+                                self.logger.info(f"第{i + 1}次心跳，FINISH状态下未找到符合条件的URL")
+                                await asyncio.sleep(5)
                                 break
-                            elif task['status'] == 'FINISH':
-                                matched = False
-                                for img in task['items']:
-                                    if 'workspace.tusiassets.com' in img['url']:
-                                        self.logger.img(f"图片url: {img['url']}")
-                                        self.img_url.append(img['url'])
-                                        matched = True
-
-                                if matched:
-                                    await self.set_backend_working_status(available=True)
-                                    return
-                                else:
-                                    self.logger.info(f"第{i + 1}次心跳，FINISH状态下未找到符合条件的URL")
-                                    await asyncio.sleep(5)
-                                    break
-                    if not task_found:
-                        self.logger.info(f"任务 {id_} 未找到")
-                        await asyncio.sleep(5)
-                        continue
+                if not task_found:
+                    self.logger.info(f"任务 {id_} 未找到")
+                    await asyncio.sleep(5)
+                    continue
 
         raise RuntimeError(f"任务 {id_} 在 {60} 次轮询后仍未完成")
 
@@ -158,25 +156,30 @@ class AIDRAW(Backend):
         self.headers.update(new_headers)
 
         await self.set_backend_working_status(available=False)
-        async with aiohttp.ClientSession(headers=self.headers) as session:
-            async with session.post(
-                    url="https://api.tusiart.cn/works/v1/works/task",
-                    data=json.dumps(input_)
-            ) as resp:
-                if resp.status not in [200, 201]:
-                    pass
-                else:
-                    task = await resp.json()
-                    if task['code'] == '1300100':
-                        error_text = f"""
+        data = json.dumps(input_)
+
+        response = await self.http_request(
+            method="POST",
+            target_url="https://api.tusiart.cn/works/v1/works/task",
+            headers=self.headers,
+            content=data
+        )
+
+        if isinstance(response, dict) and 'error' in response:
+            pass
+        else:
+            task = response
+            if task['code'] == '1300100':
+                error_text = f"""
 后端：{self.config.tusiart_setting['note'][self.count]} 遇到人机验证，需到验证。
 请前往https://tusiart.com/使用一次生图来触发验证码。
 后端已被标记为不可使用,如需继续使用请重启API"
 """
-                        self.logger.warning("遇到人机验证！")
-                        raise RuntimeError(error_text)
-                    task_id = task['data']['task']['taskId']
-                    await self.heart_beat(task_id)
+                self.logger.warning("遇到人机验证！")
+                raise RuntimeError(error_text)
+            task_id = task['data']['task']['taskId']
+            await self.heart_beat(task_id)
 
         await self.formating_to_sd_style()
+
 

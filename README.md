@@ -55,3 +55,9 @@ curl -X POST -H "Content-Type: application/json" -d '{"prompt": "reimu", "width"
 ```
 ..\venv\Scripts\python -m pip install -r utils/tagger-requirements.txt
 ```
+
+### 更新日志
+## 2024-08-13
+```angular2html
+
+```
