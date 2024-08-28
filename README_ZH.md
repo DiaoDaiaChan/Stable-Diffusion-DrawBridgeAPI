@@ -1,11 +1,13 @@
-# 调用各种在线AI绘图网站的API (简易版MarkDown)
+# 调用各种在线AI绘图网站的API以及一个简易GUI
 本项目计划进行i18n
-[English](README.md)
+[[English]](README.md)
 ## 兼容A1111webuiAPI的API
 https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/API
 
 ## 环境要求 Python3.10和Redis
 ## 特性
+- gradio简易UI(端口号为FASTAPI端口号+1)可以更换模型
+![UI](images/gradio.png)
 - 多后端负载均衡
 - 不支持并发的后端自动上锁
 - 自带打标功能,现在支持自然语言打标(CUDA/8G VRAM)以及wd tagger
@@ -59,7 +61,8 @@ curl -X POST -H "Content-Type: application/json" -d '{"prompt": "reimu", "width"
 ```
 ..\venv\Scripts\python -m pip install -r utils/tagger-requirements.txt
 ```
-
+### TODO
+简单的前端,方便进行画图/打标/等操作
 ### 更新日志
 ## 2024-08-28
 更新了使用LLM对图片进行自然语言打标,改自https://github.com/StartHua/Comfyui_CXH_joy_caption

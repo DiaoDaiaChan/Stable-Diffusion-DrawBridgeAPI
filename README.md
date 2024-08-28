@@ -1,18 +1,29 @@
-# Calling Various Online AI Drawing Website APIs (Simple Version Markdown)
-
-This project plans to implement i18n.
-(MarkDown by OpenAI)
-[中文说明](README_ZH.md)
+# Calling Various Online AI Drawing Website APIs With a Simple Gradio UI
 
 ## API Compatible with A1111webui API
+
 https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/API
+
+## 如果有需要适配的后端欢迎留下个issue,会进行适配.
+### If you have any backends that need to be adapted, please feel free to leave an issue, and I will work on the adaptation.
+## 之后项目会进行完善,我会写一些API调用教程.
+### After the project is completed, I will write some API call tutorials.
+
+## [中文说明](README_ZH.md)
+This project plans to implement i18n. (woking on it)
+## ![封面](images/cover.png)
+checkpoint by/模型 https://huggingface.co/nyanko7/flux-dev-anime-cg
 
 ## Environment Requirements: Python 3.10 and Redis
 
 ## Features
+- A Simple Gradio GUI, You can change your model here(Running on FastAPI port + 1)
+![UI](images/gradio.png)
 - Multi-backend load balancing
+![LB](images/posting.png)
 - Automatic locking for backends that do not support concurrency
-- Built-in caption feature, currently supporting natural language tagging (CUDA/8G VRAM) and wd tagger
+- Built-in caption feature(https://github.com/toriato/stable-diffusion-webui-wd14-tagger), currently supporting natural language tagging (CUDA/8G VRAM) and wd tagger
+![启动](images/caption.png)
 
 ## Supported Backends
 - https://github.com/AUTOMATIC1111/stable-diffusion-webui
@@ -24,8 +35,6 @@ https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/API
 - https://www.seaart.ai/
 - https://www.yunjie.art/
 - https://github.com/comfyanonymous/ComfyUI
-
-## QQ Group: 575601916
 
 ### Deployment Guide (For Windows CMD)
 ### You need to deploy a Redis server on the server! Please install it yourself.
@@ -73,15 +82,17 @@ If the working directory is `Stable-Diffusion-DrawBridgeAPI\DrawBridgeAPI`:
 ```
 ..\venv\Scripts\python -m pip install -r utils/tagger-requirements.txt
 ```
+## TODO
+- A simple frontend for easy drawing, tagging, and other operations.
+## Changelog
 
-### Changelog
-
-## 2024-08-28
+### 2024-08-28
 Updated to use LLM for natural language image tagging, adapted from https://github.com/StartHua/Comfyui_CXH_joy_caption.
 Note: Requires GPU and 8G VRAM.
+![vram](images/working.png)
 ```angular2html
   build_in_tagger:
-    false
+    true
   llm_caption:  # Use LLM for natural language tagging
     enable:
       true
@@ -91,5 +102,5 @@ Note: Requires GPU and 8G VRAM.
       unsloth/Meta-Llama-3.1-8B-bnb-4bit
     image_adapter: # https://huggingface.co/spaces/fancyfeast/joy-caption-pre-alpha/tree/main/wpkklhc6
       image_adapter.pt
-Dependencies are in llm_caption_requirements.txt
 ```
+Dependencies are in llm_caption_requirements.txt

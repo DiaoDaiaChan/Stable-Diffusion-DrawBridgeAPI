@@ -18,7 +18,7 @@ use_cpu = True  # 可以根据需求手动设置
 tf_device_name = '/gpu:0' if not use_cpu else '/cpu:0'
 
 wd_logger = setup_logger('[TAGGER]')
-
+# https://github.com/toriato/stable-diffusion-webui-wd14-tagger
 class Interrogator:
     @staticmethod
     def postprocess_tags(

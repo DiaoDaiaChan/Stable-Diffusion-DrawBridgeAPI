@@ -1,6 +1,5 @@
 import base64
 import os
-
 import httpx
 
 os.environ['CIVITAI_API_TOKEN'] = 'kunkun'
@@ -17,17 +16,14 @@ import asyncio
 import time
 import traceback
 import json
-import utils
+import ui
 import itertools
-import requests
 import argparse
 import uvicorn
 import threading
 import logging
 import warnings
 
-# 忽略 RuntimeWarning
-warnings.simplefilter("ignore", RuntimeWarning)
 
 app = FastAPI()
 
@@ -39,6 +35,7 @@ parser.add_argument('--port', type=int, default=8000,
 
 args = parser.parse_args()
 port = args.port
+host = args.host
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -46,16 +43,6 @@ logger = setup_logger("[API]")
 logging.getLogger("uvicorn.access").disabled = True
 logging.getLogger("uvicorn.error").disabled = True
 logging.getLogger("fastapi").disabled = True
-
-
-@app.on_event("startup")
-def startup_event():
-    threading.Thread(target=make_request).start()
-
-
-def make_request():
-    response = requests.get(f"http://localhost:{port}/sdapi/v1/sd-models")
-    logger.info(f"服务器准备就绪!")
 
 
 class Api:
@@ -144,7 +131,8 @@ class Api:
     def add_api_route(self, path: str, endpoint, **kwargs):
         return self.app.add_api_route(path, endpoint, **kwargs)
 
-    async def txt2img_api(self, request: request_model.Txt2ImgRequest, api: Request):
+    @staticmethod
+    async def txt2img_api(request: request_model.Txt2ImgRequest, api: Request):
 
         data = request.dict()
         client_host = api.client.host
@@ -166,7 +154,8 @@ class Api:
 
         return result
 
-    async def img2img_api(self, request: request_model.Txt2ImgRequest, api: Request):
+    @staticmethod
+    async def img2img_api(request: request_model.Txt2ImgRequest, api: Request):
         data = request.dict()
         client_host = api.client.host
 
@@ -187,11 +176,12 @@ class Api:
 
         return result
 
-    async def get_sd_models(self, request: Request):
+    @staticmethod
+    async def get_sd_models():
         task_list = []
         path = '/sdapi/v1/sd-models'
 
-        task_handler = TaskHandler({}, request, path, reutrn_instance=True)
+        task_handler = TaskHandler({}, None, path, reutrn_instance=True)
         instance_list: list[Backend] = await task_handler.txt2img()
 
         for i in instance_list:
@@ -232,16 +222,18 @@ class Api:
             llm_logger,
             get_caption
         )
-        is_url = False
         data = request.model_dump()
         base64_image = data['image']
         if data['image'].startswith("http"):
             image_url = data['image']
-            is_url = True
+            llm_logger.info(f"检测到url{image_url}")
             response: httpx.Response = await self.backend_instance.http_request(
                 "POST",
-                image_url
+                image_url,
+                format=False
             )
+            if response.status_code != 200:
+                llm_logger.warning("图片下载失败!")
             base64_image = base64.b64encode(response.read())
         try:
             caption = await asyncio.get_event_loop().run_in_executor(
@@ -281,7 +273,10 @@ class Api:
     async def get_options(self):
         return JSONResponse(self.backend_instance.format_options_api_resp())
 
+
 api_instance= Api()
+
+
 @app.post('/sdapi/v1/prompt-styles')
 async def _(request):
     pass
@@ -309,9 +304,18 @@ async def proxy(path: str, request: Request):
 @app.get("/backend-control")
 async def get_backend_control(backend: str, key: str, value: bool):
     pass
-uvicorn.run(app, host=args.host, port=args.port, log_level='critical')
 
 
-# uvicorn.run(app, host=args.host, port=args.port)
+threading.Thread(
+    target=uvicorn.run,
+    args=(app,),
+    kwargs={
+        "host": host,
+        "port": port,
+        "log_level": "critical"
+    }
+).start()
+
+asyncio.run(ui.run_gradio(host, port))
 
 

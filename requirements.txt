@@ -16,3 +16,5 @@ replicate
 
 tqdm
 uvicorn
+
+gradio>=4.0.0

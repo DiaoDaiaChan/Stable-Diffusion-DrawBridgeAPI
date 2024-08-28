@@ -10,7 +10,7 @@ import torch.amp.autocast_mode
 from PIL import Image
 import numpy as np
 
-from base_config import setup_logger, server_settings
+from base_config import setup_logger, config
 
 llm_logger = setup_logger('[LLM-Caption]')
 
@@ -59,7 +59,7 @@ class Joy_caption_load:
             self.pipeline.clearCache()
 
             # clip
-        model_id = server_settings['llm_caption']['clip']
+        model_id = config.server_settings['llm_caption']['clip']
 
         model = AutoModel.from_pretrained(model_id)
         clip_processor = AutoProcessor.from_pretrained(model_id)
@@ -74,7 +74,7 @@ class Joy_caption_load:
         clip_model.to("cuda")
 
         # LLM
-        model_path_llm = server_settings['llm_caption']['llm']
+        model_path_llm = config.server_settings['llm_caption']['llm']
         tokenizer = AutoTokenizer.from_pretrained(model_path_llm, use_fast=False)
         assert isinstance(tokenizer, PreTrainedTokenizer) or isinstance(tokenizer,
                                                                         PreTrainedTokenizerFast), f"Tokenizer is of type {type(tokenizer)}"
@@ -86,7 +86,7 @@ class Joy_caption_load:
 
         image_adapter = ImageAdapter(clip_model.config.hidden_size,
                                      text_model.config.hidden_size)  # ImageAdapter(clip_model.config.hidden_size, 4096)
-        image_adapter.load_state_dict(torch.load(server_settings['llm_caption']['image_adapter'], map_location="cpu", weights_only=True))
+        image_adapter.load_state_dict(torch.load(config.server_settings['llm_caption']['image_adapter'], map_location="cpu", weights_only=True))
         adjusted_adapter = image_adapter  # AdjustedImageAdapter(image_adapter, text_model.config.hidden_size)
         adjusted_adapter.eval()
         adjusted_adapter.to("cuda")
@@ -194,7 +194,7 @@ class Joy_caption:
 def get_joy_cation_instance():
 
     joy_caption_load = Joy_caption_load()
-    model_path = "unsloth/Meta-Llama-3.1-8B-bnb-4bit"
+    model_path = config.server_settings['llm_caption']['llm']
 
     pipeline, = joy_caption_load.gen(model_path)
 
@@ -207,6 +207,7 @@ def get_caption(pipeline, joy_caption: Joy_caption, image):
     if image.startswith("data:image/png;base64,"):
         image = image.replace("data:image/png;base64,", "")
     image = Image.open(BytesIO(base64.b64decode(image))).convert(mode="RGB")
+    llm_logger.info("开始打标")
 
     caption = joy_caption.gen(
         joy_pipeline=pipeline,
