@@ -189,7 +189,7 @@ class WaifuDiffusionInterrogator(Interrogator):
         return np.array(image)
 
 
-def tagger_main(base64_img, threshold, wd_instance):
+def tagger_main(base64_img, threshold, wd_instance, ntags=[]):
 
     image_data = base64.b64decode(base64_img)
     image = Image.open(BytesIO(image_data))
@@ -199,7 +199,7 @@ def tagger_main(base64_img, threshold, wd_instance):
         tags=tags,
         threshold=threshold,
         additional_tags=['best quality', 'highres'],
-        exclude_tags=['lowres'],
+        exclude_tags=['lowres'] + ntags,
         sort_by_alphabetical_order=False,
         add_confident_as_weight=True,
         replace_underscore=True,

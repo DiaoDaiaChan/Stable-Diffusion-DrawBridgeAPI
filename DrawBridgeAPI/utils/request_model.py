@@ -119,4 +119,5 @@ class Img2ImgRequest(RequetModelClass):
 class TaggerRequest(RequetModelClass):
     image: str = '',
     model: str = 'wd14-vit-v2'
-    threshold: float = 0.35
+    threshold: float = 0.35,
+    exclude_tags: List[str] = []

@@ -128,7 +128,7 @@ server_settings:
     false
   llm_caption:  # 使用llm用自然语言打标
     enable:
-      true
+      false
     clip:
       google/siglip-so400m-patch14-384
     llm:

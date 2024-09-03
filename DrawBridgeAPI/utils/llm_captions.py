@@ -202,20 +202,29 @@ def get_joy_cation_instance():
     return pipeline, joy_caption
 
 
-def get_caption(pipeline, joy_caption: Joy_caption, image):
+def get_caption(
+        pipeline,
+        joy_caption: Joy_caption,
+        image,
+        ntags=[]
+):
     from io import BytesIO
     if image.startswith("data:image/png;base64,"):
         image = image.replace("data:image/png;base64,", "")
     image = Image.open(BytesIO(base64.b64decode(image))).convert(mode="RGB")
-    llm_logger.info("开始打标")
+
+    extra_ = f"do not describe {','.join(ntags)} if it exist" if ntags else ''
 
     caption = joy_caption.gen(
         joy_pipeline=pipeline,
         image=image,
-        prompt="A descriptive caption for this image",
+        prompt=f"A descriptive caption for this image, do not describe a signature or text in the image,{extra_}",
         max_new_tokens=300,
         temperature=0.5,
         cache=True
     )
 
     return caption[0]
+
+
+pipeline, joy_caption_instance = get_joy_cation_instance()

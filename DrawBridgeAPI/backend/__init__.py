@@ -224,6 +224,20 @@ class A1111WebuiHandler(BaseHandler):
         return self.instance_list, self.enable_backend
 
 
+class A1111WebuiHandlerAPI(BaseHandler):
+    async def get_all_instance(self) -> tuple[list[Backend], dict]:
+
+        man_enable_task = self.config.server_settings['enable_sdapi_backends']
+        if len(man_enable_task) != 0:
+            man_enable_task = man_enable_task
+        else:
+            man_enable_task = self.all_task_list
+
+        await self.get_enable_task(man_enable_task)
+
+        return self.instance_list, self.enable_backend
+
+
 class ComfyuiHandler(BaseHandler):
 
     async def get_all_instance(self) -> tuple[list[Backend], dict]:
@@ -286,7 +300,7 @@ class TaskHandler:
 
     async def sd_api(self) -> JSONResponse or list[Backend]:
 
-        self.instance_list, self.enable_backend = await A1111WebuiHandler(
+        self.instance_list, self.enable_backend = await A1111WebuiHandlerAPI(
             self.payload,
             self.request,
             self.path

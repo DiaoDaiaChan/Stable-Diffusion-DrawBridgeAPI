@@ -103,14 +103,15 @@ class Api:
 
             self.add_api_route(
                 "/tagger/v1/interrogate",
-                self.tagger,
+                self.llm_caption if config.server_settings['llm_caption']['enable'] else self.tagger,
                 methods=["POST"],
                 response_model=request_model.TaggerRequest
             )
 
             if config.server_settings['llm_caption']['enable']:
                 from utils.llm_captions import (
-                    get_joy_cation_instance,
+                    pipeline,
+                    joy_caption_instance,
                     llm_logger,
                     get_caption
                 )
@@ -123,7 +124,7 @@ class Api:
                 )
 
                 llm_logger.info("LLM加载中")
-                pipeline, joy_caption_instance = get_joy_cation_instance()
+
                 self.pipeline = pipeline
                 self.joy_caption_instance = joy_caption_instance
                 llm_logger.info("LLM加载完成,等待命令")
@@ -209,7 +210,8 @@ class Api:
             tagger_main,
             data['image'],
             data['threshold'],
-            self.wd_instance
+            self.wd_instance,
+            data['exclude_tags']
         )
 
         resp = {}
@@ -241,7 +243,8 @@ class Api:
             get_caption,
             self.pipeline,
             self.joy_caption_instance,
-            base64_image
+            base64_image,
+            data['exclude_tags']
         )
         except Exception as e:
             traceback.print_exc()
@@ -274,7 +277,7 @@ class Api:
         return JSONResponse(self.backend_instance.format_options_api_resp())
 
 
-api_instance= Api()
+api_instance = Api()
 
 
 @app.post('/sdapi/v1/prompt-styles')
