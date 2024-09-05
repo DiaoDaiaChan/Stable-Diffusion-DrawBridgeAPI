@@ -1,6 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, conint
 from dataclasses import field
 from typing import Optional, List, Dict, Any
+from pathlib import Path
 import random
 
 
@@ -118,6 +119,27 @@ class Img2ImgRequest(RequetModelClass):
 
 class TaggerRequest(RequetModelClass):
     image: str = '',
-    model: str = 'wd14-vit-v2'
-    threshold: float = 0.35,
-    exclude_tags: List[str] = []
+    model: Optional[str] = 'wd14-vit-v2'
+    threshold: Optional[float] = 0.35,
+    exclude_tags: Optional[List[str]] = []
+
+
+class TopzAiRequest(BaseModel):
+    image: Optional[str] = None
+    input_folder: Optional[str or Path]
+    output_folder: Optional[str] = None
+    overwrite: Optional[bool] = False
+    recursive: Optional[bool] = False
+    format: Optional[str] = "preserve"  # 可选值: jpg, jpeg, png, tif, tiff, dng, preserve
+    quality: Optional[conint(ge=0, le=100)] = 95  # JPEG 质量，0到100之间
+    compression: Optional[conint(ge=0, le=10)] = 2  # PNG 压缩，0到10之间
+    bit_depth: Optional[conint(strict=True, ge=8, le=16)] = 16  # TIFF 位深度，8或16
+    tiff_compression: Optional[str] = "zip"  # 可选值: none, lzw, zip
+    show_settings: Optional[bool] = False
+    skip_processing: Optional[bool] = False
+    verbose: Optional[bool] = False
+    upscale: Optional[bool] = None
+    noise: Optional[bool] = None
+    sharpen: Optional[bool] = None
+    lighting: Optional[bool] = None
+    color: Optional[bool] = None
