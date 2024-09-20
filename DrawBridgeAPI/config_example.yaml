@@ -56,8 +56,8 @@ liblibai_setting:
   preference:
     - pretags:  # 内置prompt
         1.5:  #  1.5模式下的预设词条，上面为正面，下面为负面
-          - ''
-          - ''
+          - ''  # prompt
+          - ''  # negative prompt
         xl:  # xl 同上
           - ""
           - ""

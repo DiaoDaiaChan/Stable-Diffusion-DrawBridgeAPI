@@ -576,9 +576,10 @@ class Backend:
             params=None,
             content=None,
             format=True,
-            timeout=300
+            timeout=300,
+            verify=True
     ) -> json or httpx.Response:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=verify) as client:
             try:
                 response = await client.request(
                     method,

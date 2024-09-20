@@ -33,7 +33,8 @@ class AIDRAW(Backend):
                 method="POST",
                 target_url=f"https://liblib-api.vibrou.com/gateway/sd-api/generate/progress/msg/v3/{id_}",
                 headers=self.headers,
-                content=json.dumps({"flag": 0})
+                content=json.dumps({"flag": 0}),
+                verify=False
             )
 
             # 检查请求结果并处理
@@ -199,7 +200,8 @@ class AIDRAW(Backend):
             method="POST",
             target_url="https://liblib-api.vibrou.com/gateway/sd-api/generate/image",
             headers=self.headers,
-            content=json.dumps(input_)
+            content=json.dumps(input_),
+            verify=False
         )
 
         # 检查请求结果
@@ -207,7 +209,7 @@ class AIDRAW(Backend):
             self.logger.warning(f"Failed to request: {response}")
         else:
             task = response
-            if task['msg'] == 'Insufficient power':
+            if task.get('msg') == 'Insufficient power':
                 self.logger.warning('费用不足!')
             self.logger.info(f"API返回{task}")
             task_id = task['data']

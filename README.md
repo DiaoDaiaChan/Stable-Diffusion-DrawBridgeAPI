@@ -54,7 +54,9 @@ python -m venv venv
 #### Modify Configuration File
 Copy `config_example.yaml` to `config.yaml`.
 [See Detailed Instructions](DrawBridgeAPI/config_example.yaml)
-
+How to select enable backend?
+![See Detailed Instructions](images/how_to_enable_backend1.png)
+![See Detailed Instructions](images/how_to_enable_backend2.png)
 #### Start
 Please note that the working directory must be the `DrawBridgeAPI` directory!
 ```
