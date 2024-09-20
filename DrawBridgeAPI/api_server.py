@@ -6,11 +6,12 @@ os.environ['CIVITAI_API_TOKEN'] = 'kunkun'
 os.environ['FAL_KEY'] = 'Daisuki'
 from backend import TaskHandler, Backend
 from base_config import setup_logger, redis_client, config
-from utils import request_model
+from utils import request_model, topaz
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
+from pathlib import Path
 
 import asyncio
 import time
@@ -23,6 +24,8 @@ import uvicorn
 import threading
 import logging
 import warnings
+import uuid
+import aiofiles
 
 
 app = FastAPI()
@@ -103,7 +106,7 @@ class Api:
 
             self.add_api_route(
                 "/tagger/v1/interrogate",
-                self.llm_caption if config.server_settings['llm_caption']['enable'] else self.tagger,
+                self.tagger,
                 methods=["POST"],
                 response_model=request_model.TaggerRequest
             )
@@ -129,13 +132,20 @@ class Api:
                 self.joy_caption_instance = joy_caption_instance
                 llm_logger.info("LLM加载完成,等待命令")
 
+        if config.server_settings['build_in_photoai']:
+            self.add_api_route(
+                "/topazai/image",
+                self.topaz_ai,
+                methods=["POST"]
+            )
+
     def add_api_route(self, path: str, endpoint, **kwargs):
         return self.app.add_api_route(path, endpoint, **kwargs)
 
     @staticmethod
     async def txt2img_api(request: request_model.Txt2ImgRequest, api: Request):
 
-        data = request.dict()
+        data = request.model_dump()
         client_host = api.client.host
         model_to_backend = None
 
@@ -157,7 +167,7 @@ class Api:
 
     @staticmethod
     async def img2img_api(request: request_model.Txt2ImgRequest, api: Request):
-        data = request.dict()
+        data = request.model_dump()
         client_host = api.client.host
 
         if len(data['init_images']) == 0:
@@ -275,6 +285,56 @@ class Api:
 
     async def get_options(self):
         return JSONResponse(self.backend_instance.format_options_api_resp())
+
+    async def topaz_ai(self, request: request_model.TopzAiRequest):
+        data = request.model_dump()
+
+
+        # 生成唯一的 UUID 目录路径
+        unique_id = str(uuid.uuid4())
+        save_dir = Path("saved_images") / unique_id
+        processed_dir = save_dir / 'processed'
+        save_dir.mkdir(parents=True, exist_ok=True)
+        del data['output_folder']
+        # 保存图像到生成的文件夹中
+        try:
+
+            if data['image']:
+                base64_image = data['image']
+                input_image_path = save_dir / f"{unique_id}_image.png"  # 假设保存为 PNG 文件
+                async with aiofiles.open(input_image_path, "wb") as image_file:
+                    await image_file.write(base64.b64decode(base64_image))
+                output, error, return_code = await asyncio.get_running_loop().run_in_executor(
+                    None, topaz.run_tpai(
+                        input_folder=str(save_dir.resolve()),
+                        output_folder=str(processed_dir.resolve()),
+                        **data
+                    )
+                )
+            elif data['input_folder']:
+                output, error, return_code = await asyncio.get_running_loop().run_in_executor(
+                    None, topaz.run_tpai(
+                        output_folder=str(processed_dir.resolve()),
+                        **data
+                    )
+                )
+        except:
+            traceback.print_exc()
+
+        # 检查处理结果并读取生成的图像文件
+        if return_code == 0:
+            files = list(processed_dir.glob("*"))
+
+            processed_image_path = files[0]
+            if processed_image_path.exists():
+                async with aiofiles.open(processed_image_path, "rb") as img_file:
+                    encoded_image = base64.b64encode(await img_file.read()).decode('utf-8')
+                processed_dir.rmdir()
+                return {"status": "success", "image": encoded_image}
+            else:
+                raise HTTPException(status_code=500, detail="Processed image not found.")
+        else:
+            raise HTTPException(status_code=500, detail=f"Error: {error}")
 
 
 api_instance = Api()

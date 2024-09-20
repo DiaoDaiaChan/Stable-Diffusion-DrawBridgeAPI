@@ -135,6 +135,9 @@ server_settings:
       unsloth/Meta-Llama-3.1-8B-bnb-4bit
     image_adapter: # https://huggingface.co/spaces/fancyfeast/joy-caption-pre-alpha/tree/main/wpkklhc6
       image_adapter.pt
+  build_in_photoai:
+    exec_path:
+      "C:\\Program Files\\Topaz Labs LLC\\Topaz Photo AI\\tpai.exe"
 
 backend_name_list:  # 不要动！
   - civitai
