@@ -1,6 +1,6 @@
 civitai_setting: # civitai API token
   token:
-    -
+    - 1
   model:
     ''
   proxy:
@@ -26,12 +26,12 @@ a1111webui_setting:   # sd_webui 设置
     - 1572864
 fal_ai_setting: # {"token": []}
   token:  # 
-    -
+    - 1
   model:
     ''
 replicate_setting: # {"token": []}
   token:  # https://replicate.com/black-forest-labs/flux-schnell
-    -
+    - 1
   model:
     ''
 liblibai_setting:
@@ -91,12 +91,12 @@ tusiart_setting:
     - https://tusiart.com/u/759763664390847335
 seaart_setting:
   token:
-    -
+    - 1
   model:
     -
 yunjie_setting:
   token:
-    -
+    - 1
   model:
     -
   note:
@@ -115,7 +115,7 @@ server_settings:
   # 再比如 enable_txt2img_backends: [3, 4, 5] 表示启动 liblib 的所有两个token 和 tusiart的第一个token
   enable_txt2img_backends: [5,6,7,8,9,10,11]
   enable_img2img_backends: [1]
-#  enable_sdapi_backends: [1]
+  enable_sdapi_backends: [1]
   redis_server:  # 必填 Redis服务器
     - 127.0.0.1  # 地址
     - 6379  # 端口

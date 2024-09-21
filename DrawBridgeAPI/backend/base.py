@@ -898,7 +898,8 @@ class Backend:
                     f"{self.backend_url}/sdapi/v1/sd-models",
                 )
             except Exception:
-                respond = []
+                self.logger.warning(f"获取模型失败，错误信息: {traceback.format_exc()}")
+                respond = f"获取模型失败，错误信息: {traceback.format_exc()}"
 
             finally:
                 backend_to_models_dict = {

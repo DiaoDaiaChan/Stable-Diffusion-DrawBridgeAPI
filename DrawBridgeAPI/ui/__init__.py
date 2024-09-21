@@ -17,6 +17,7 @@ class Gradio:
 
     def get_all_models(self):
         all_models_list = httpx.get(f"http://{self.host}:{self.port}/sdapi/v1/sd-models").json()
+        print(all_models_list)
         return [i['title'] for i in all_models_list]
 
     def get_caption(self, image):
