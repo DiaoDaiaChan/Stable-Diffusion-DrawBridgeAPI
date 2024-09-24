@@ -5,7 +5,6 @@ import httpx
 os.environ['CIVITAI_API_TOKEN'] = 'kunkun'
 os.environ['FAL_KEY'] = 'Daisuki'
 from backend import TaskHandler, Backend
-from base_config import setup_logger, redis_client, config
 from utils import request_model, topaz
 
 from fastapi import FastAPI, Request
@@ -35,10 +34,17 @@ parser.add_argument('--host', type=str, default='0.0.0.0',
                     help='The host IP address to listen on (default: 0.0.0.0).')
 parser.add_argument('--port', type=int, default=8000,
                     help='The port number to listen on (default: 8000).')
+parser.add_argument('--conf', '-c', type=str, default='./config.yaml',
+                    help='配置文件路径', dest='conf')
 
 args = parser.parse_args()
 port = args.port
 host = args.host
+config_file_path = args.conf
+
+from base_config import init
+init(config_file_path)
+from base_config import setup_logger, redis_client,config
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 

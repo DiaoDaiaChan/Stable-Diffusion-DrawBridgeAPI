@@ -1,7 +1,9 @@
 import yaml as yaml_
+import shutil
 import redis
 import json
 import logging
+import os
 
 from pydantic_settings import BaseSettings
 from pathlib import Path
@@ -9,6 +11,7 @@ from datetime import datetime
 
 redis_client = None
 
+api_current_dir = os.path.dirname(os.path.abspath(__file__))
 
 class CustomFormatter(logging.Formatter):
     def __init__(self, fmt=None, datefmt=None, style='%', prefix="[MAIN]"):
@@ -160,113 +163,118 @@ class Config(BaseSettings):
     name_url: dict = {}
 
 
-logger = setup_logger(custom_prefix="[INIT]")
+def load_config(logger, config_file_path):
 
-welcome_txt = '''
-欢迎使用 
-  _____                              ____           _       _                               _____    _____ 
- |  __ \                            |  _ \         (_)     | |                      /\     |  __ \  |_   _|
- | |  | |  _ __    __ _  __      __ | |_) |  _ __   _    __| |   __ _    ___       /  \    | |__) |   | |  
- | |  | | | '__|  / _` | \ \ /\ / / |  _ <  | '__| | |  / _` |  / _` |  / _ \     / /\ \   |  ___/    | |  
- | |__| | | |    | (_| |  \ V  V /  | |_) | | |    | | | (_| | | (_| | |  __/    / ____ \  | |       _| |_ 
- |_____/  |_|     \__,_|   \_/\_/   |____/  |_|    |_|  \__,_|  \__, |  \___|   /_/    \_\ |_|      |_____|
-                                                                 __/ |                                     
-                                                                |___/
-关注雕雕, 关注雕雕喵
-项目地址: https://github.com/DiaoDaiaChan/Stable-Diffusion-DrawBridgeAPI                                                                                                      
-'''
+    with open(config_file_path, "r", encoding="utf-8") as f:
+        yaml_config = yaml_.load(f, Loader=yaml_.FullLoader)
+        config = Config(**yaml_config)
+        logger.info('加载配置文件完成')
 
-print(welcome_txt)
+        return config
+
+def package_import(copy_to_config_path):
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    source_template = Path(os.path.join(current_dir, "config_example.yaml")).resolve()
+    shutil.copy(source_template, copy_to_config_path)
 
 
-workload_dict = {}
-config_file_path = Path('./config.yaml')
+def init(config_file_path='./config.yaml'):
 
-with open(config_file_path, "r", encoding="utf-8") as f:
-    yaml_config = yaml_.load(f, Loader=yaml_.FullLoader)
-    config = Config(**yaml_config)
-    logger.info('加载配置文件完成')
+    logger = setup_logger(custom_prefix="[INIT]")
 
+    config = load_config(logger, config_file_path)
 
-config.civitai = config.civitai_setting['token']
-config.a1111webui = config.a1111webui_setting
-config.fal_ai = config.fal_ai_setting['token']
-config.replicate = config.replicate_setting['token']
-config.liblibai = config.liblibai_setting['token']
-config.tusiart = config.tusiart_setting['token']
-config.seaart = config.seaart_setting['token']
-config.yunjie = config.yunjie_setting['token']
-config.comfyui = config.comfyui_setting
+    welcome_txt = '''
+    欢迎使用 
+      _____                              ____           _       _                               _____    _____ 
+     |  __ \                            |  _ \         (_)     | |                      /\     |  __ \  |_   _|
+     | |  | |  _ __    __ _  __      __ | |_) |  _ __   _    __| |   __ _    ___       /  \    | |__) |   | |  
+     | |  | | | '__|  / _` | \ \ /\ / / |  _ <  | '__| | |  / _` |  / _` |  / _ \     / /\ \   |  ___/    | |  
+     | |__| | | |    | (_| |  \ V  V /  | |_) | | |    | | | (_| | | (_| | |  __/    / ____ \  | |       _| |_ 
+     |_____/  |_|     \__,_|   \_/\_/   |____/  |_|    |_|  \__,_|  \__, |  \___|   /_/    \_\ |_|      |_____|
+                                                                     __/ |                                     
+                                                                    |___/
+    关注雕雕, 关注雕雕喵
+    项目地址: https://github.com/DiaoDaiaChan/Stable-Diffusion-DrawBridgeAPI                                                                                                      
+    '''
 
-sources_list = [
-    (config.civitai, 0, config.civitai_name),
-    (config.a1111webui, 1, config.a1111webui_name),
-    (config.fal_ai, 2, config.fal_ai_name),
-    (config.replicate, 3, config.replicate_name),
-    (config.liblibai, 4, config.liblibai_name),
-    (config.tusiart, 5, config.tusiart_name),
-    (config.seaart, 6, config.seaart_name),
-    (config.yunjie, 7, config.yunjie_name),
-    (config.comfyui, 8, config.comfyui_name),
-]
+    print(welcome_txt)
 
 
-def process_items(config, items, backend_index, name_dict):
-    if backend_index == 1:  # 特殊处理 config.a1111webui
-        for i in range(len(items['name'])):
-            key = f"{config.backend_name_list[backend_index]}-{items['name'][i]}"
-            config.workload_dict[key] = config.base_workload_dict
-            name_dict[f"a1111-{items['name'][i]}"] = items['backend_url'][i]
-    elif backend_index == 8:
-        for i in range(len(items['name'])):
-            key = f"{config.backend_name_list[backend_index]}-{items['name'][i]}"
-            config.workload_dict[key] = config.base_workload_dict
-            name_dict[f"comfyui-{items['name'][i]}"] = items['backend_url'][i]
-    else:
-        for n in items:
-            key = f"{config.backend_name_list[backend_index]}-{n}"
-            config.workload_dict[key] = config.base_workload_dict
-            name_dict[key] = n
+    config.civitai = config.civitai_setting['token']
+    config.a1111webui = config.a1111webui_setting
+    config.fal_ai = config.fal_ai_setting['token']
+    config.replicate = config.replicate_setting['token']
+    config.liblibai = config.liblibai_setting['token']
+    config.tusiart = config.tusiart_setting['token']
+    config.seaart = config.seaart_setting['token']
+    config.yunjie = config.yunjie_setting['token']
+    config.comfyui = config.comfyui_setting
 
+    sources_list = [
+        (config.civitai, 0, config.civitai_name),
+        (config.a1111webui, 1, config.a1111webui_name),
+        (config.fal_ai, 2, config.fal_ai_name),
+        (config.replicate, 3, config.replicate_name),
+        (config.liblibai, 4, config.liblibai_name),
+        (config.tusiart, 5, config.tusiart_name),
+        (config.seaart, 6, config.seaart_name),
+        (config.yunjie, 7, config.yunjie_name),
+        (config.comfyui, 8, config.comfyui_name),
+    ]
 
-for items, backend_index, name_dict in sources_list:
-    process_items(config, items, backend_index, name_dict)
+    def process_items(config, items, backend_index, name_dict):
+        if backend_index == 1:  # 特殊处理 config.a1111webui
+            for i in range(len(items['name'])):
+                key = f"{config.backend_name_list[backend_index]}-{items['name'][i]}"
+                config.workload_dict[key] = config.base_workload_dict
+                name_dict[f"a1111-{items['name'][i]}"] = items['backend_url'][i]
+        elif backend_index == 8:
+            for i in range(len(items['name'])):
+                key = f"{config.backend_name_list[backend_index]}-{items['name'][i]}"
+                config.workload_dict[key] = config.base_workload_dict
+                name_dict[f"comfyui-{items['name'][i]}"] = items['backend_url'][i]
+        else:
+            for n in items:
+                key = f"{config.backend_name_list[backend_index]}-{n}"
+                config.workload_dict[key] = config.base_workload_dict
+                name_dict[key] = n
 
+    for items, backend_index, name_dict in sources_list:
+        process_items(config, items, backend_index, name_dict)
 
-def merge_and_count(*args):
-    merged_dict = {}
-    lengths = []
-    for arg in args:
-        merged_dict |= arg[2]
-        lengths.append(len(arg[0]))
-    return merged_dict, tuple(lengths)
+    def merge_and_count(*args):
+        merged_dict = {}
+        lengths = []
+        for arg in args:
+            merged_dict |= arg[2]
+            lengths.append(len(arg[0]))
+        return merged_dict, tuple(lengths)
 
+    config.name_url = merge_and_count(*sources_list)
 
-config.name_url = merge_and_count(*sources_list)
+    models_dict = {}
+    models_dict['is_loaded'] = False
+    for back_name in list(config.workload_dict.keys()):
+        models_dict[back_name] = config.models_list
 
-models_dict = {}
-models_dict['is_loaded'] = False
-for back_name in list(config.workload_dict.keys()):
-    models_dict[back_name] = config.models_list
+    redis_client = redis.Redis(
+        host=config.server_settings['redis_server'][0],
+        port=config.server_settings['redis_server'][1],
+        password=config.server_settings['redis_server'][2],
+        db=1
+    )
 
+    logger.info('redis连接成功')
 
-redis_client = redis.Redis(
-    host=config.server_settings['redis_server'][0],
-    port=config.server_settings['redis_server'][1],
-    password=config.server_settings['redis_server'][2],
-    db=1
-)
+    current_date = datetime.now().date()
+    day = str(int(datetime.combine(current_date, datetime.min.time()).timestamp()))
 
-redis_pipe = redis_client.pipeline()
+    workload_json = json.dumps(config.workload_dict)
 
-logger.info('redis连接成功')
+    rp = redis_client.pipeline()
+    rp.set('workload', workload_json)
+    rp.set('models', json.dumps(models_dict))
+    rp.execute()
 
-current_date = datetime.now().date()
-day = str(int(datetime.combine(current_date, datetime.min.time()).timestamp()))
-
-workload_json = json.dumps(config.workload_dict)
-
-rp = redis_client.pipeline()
-rp.set('workload', workload_json)
-rp.set('models', json.dumps(models_dict))
-rp.execute()
+init()
