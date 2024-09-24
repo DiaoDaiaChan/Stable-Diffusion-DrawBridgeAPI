@@ -1,4 +1,5 @@
 import os
+import asyncio
 
 import pandas as pd
 import numpy as np
@@ -11,14 +12,16 @@ from PIL import Image
 from pathlib import Path
 from huggingface_hub import hf_hub_download
 
-from base_config import setup_logger
+from ..base_config import setup_logger, init_instance
 
-# 设置处理设备，默认为GPU，如果不可用则使用CPU
-use_cpu = True  # 可以根据需求手动设置
+
+use_cpu = True
 tf_device_name = '/gpu:0' if not use_cpu else '/cpu:0'
 
 wd_logger = setup_logger('[TAGGER]')
 # https://github.com/toriato/stable-diffusion-webui-wd14-tagger
+
+
 class Interrogator:
     @staticmethod
     def postprocess_tags(
@@ -189,30 +192,72 @@ class WaifuDiffusionInterrogator(Interrogator):
         return np.array(image)
 
 
-def tagger_main(base64_img, threshold, wd_instance, ntags=[]):
+class WaifuDiffusionTaggerHandler:
+    def __init__(self, name, repo_id, revision, model_path, tags_path):
+        self.name = name
+        self.repo_id = repo_id
+        self.revision = revision
+        self.model_path = model_path
+        self.tags_path = tags_path
+        self.wd_instance = self._initialize()
 
-    image_data = base64.b64decode(base64_img)
-    image = Image.open(BytesIO(image_data))
+    def _initialize(self):
+        wd_instance = WaifuDiffusionInterrogator(
+            name=self.name,
+            repo_id=self.repo_id,
+            revision=self.revision,
+            model_path=self.model_path,
+            tags_path=self.tags_path
+        )
+        wd_logger.info("模型加载中")
+        wd_instance.load()
+        wd_logger.info("模型加载完成")
+        return wd_instance
 
-    ratings, tags = wd_instance.interrogate(image)
-    processed_tags = Interrogator.postprocess_tags(
-        tags=tags,
-        threshold=threshold,
-        additional_tags=['best quality', 'highres'],
-        exclude_tags=['lowres'] + ntags,
-        sort_by_alphabetical_order=False,
-        add_confident_as_weight=True,
-        replace_underscore=True,
-        replace_underscore_excludes=[],
-        escape_tag=False
+    async def tagger_main(self, base64_img, threshold, ntags=[]):
+        if base64_img.startswith(b"data:image/png;base64,"):
+            base64_img = base64_img.replace("data:image/png;base64,", "")
+
+        image_data = base64.b64decode(base64_img)
+        image = Image.open(BytesIO(image_data))
+
+        loop = asyncio.get_event_loop()
+        ratings, tags = await loop.run_in_executor(
+            None,
+            self.wd_instance.interrogate,
+            image
+        )
+
+        # 处理标签
+        processed_tags = Interrogator.postprocess_tags(
+            tags=tags,
+            threshold=threshold,
+            additional_tags=['best quality', 'highres'],
+            exclude_tags=['lowres'] + ntags,
+            sort_by_alphabetical_order=False,
+            add_confident_as_weight=True,
+            replace_underscore=True,
+            replace_underscore_excludes=[],
+            escape_tag=False
+        )
+
+        def process_dict(input_dict):
+            processed_dict = {}
+            for key, value in input_dict.items():
+                cleaned_key = key.strip('()').split(':')[0]
+                processed_dict[cleaned_key] = value
+            return processed_dict
+
+        processed_tags = process_dict(processed_tags)
+        return {**ratings, **processed_tags}
+
+
+config = init_instance.config
+if config.server_settings['build_in_tagger']:
+    wd_tagger_handler = WaifuDiffusionTaggerHandler(
+        name='WaifuDiffusion',
+        repo_id='SmilingWolf/wd-v1-4-convnextv2-tagger-v2',
+        revision='v2.0',
+        model_path='model.onnx',
+        tags_path='selected_tags.csv'
     )
-
-    def process_dict(input_dict):
-        processed_dict = {}
-        for key, value in input_dict.items():
-            cleaned_key = key.strip('()').split(':')[0]
-            processed_dict[cleaned_key] = value
-        return processed_dict
-
-    processed_tags = process_dict(processed_tags)
-    return ratings | processed_tags

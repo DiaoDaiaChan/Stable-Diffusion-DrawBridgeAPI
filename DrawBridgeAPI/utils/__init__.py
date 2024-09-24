@@ -1,5 +1,6 @@
 import httpx
 from fastapi.exceptions import HTTPException
+import asyncio
 
 
 async def http_request(
@@ -27,3 +28,12 @@ async def http_request(
         else:
             return response
 
+
+async def run_later(func, delay=1):
+    loop = asyncio.get_running_loop()
+    loop.call_later(
+        delay,
+        lambda: loop.create_task(
+            func
+        )
+    )

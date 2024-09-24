@@ -10,7 +10,7 @@ from colorama import Fore, Style
 from colorama import init
 init()
 
-from base_config import setup_logger, config, redis_client
+from ..base_config import init_instance, setup_logger
 from .SD_civitai_API import AIDRAW
 from .SD_A1111_webui import AIDRAW as AIDRAW2
 from .FLUX_falai import AIDRAW as AIDRAW3
@@ -36,8 +36,8 @@ class BaseHandler:
         self.payload = payload
         self.request = request
         self.path = path
-        self.config = config
-        self.all_task_list = list(range(len(list(config.name_url[0].keys()))))
+        self.config = init_instance.config
+        self.all_task_list = list(range(len(list(init_instance.config.name_url[0].keys()))))
         self.enable_backend: dict = {}
         self.comfyui_task: str = 'sdbase_txt2img'
 
@@ -75,7 +75,7 @@ class BaseHandler:
     async def get_civitai_task(self):
         instance_list = []
         counter = 0
-        for i in config.civitai:
+        for i in self.config.civitai:
             if i is not None:
                 aidraw_instance = AIDRAW(count=counter, payload=self.payload)
                 counter += 1
@@ -87,7 +87,7 @@ class BaseHandler:
 
         instance_list = []
         counter = 0
-        for i in config.a1111webui['name']:
+        for i in self.config.a1111webui['name']:
             aidraw_instance = AIDRAW2(
                 count=counter,
                 payload=self.payload,
@@ -103,7 +103,7 @@ class BaseHandler:
 
         instance_list = []
         counter = 0
-        for i in config.fal_ai:
+        for i in self.config.fal_ai:
             if i is not None:
                 aidraw_instance = AIDRAW3(count=counter, payload=self.payload)
                 counter += 1
@@ -115,7 +115,7 @@ class BaseHandler:
 
         instance_list = []
         counter = 0
-        for i in config.replicate:
+        for i in self.config.replicate:
             if i is not None:
                 aidraw_instance = AIDRAW4(count=counter, payload=self.payload)
                 counter += 1
@@ -126,7 +126,7 @@ class BaseHandler:
     async def get_liblibai_task(self):
         instance_list = []
         counter = 0
-        for i in config.liblibai:
+        for i in self.config.liblibai:
             if i is not None:
                 aidraw_instance = AIDRAW5(count=counter, payload=self.payload)
                 counter += 1
@@ -137,7 +137,7 @@ class BaseHandler:
     async def get_tusiart_task(self):
         instance_list = []
         counter = 0
-        for i in config.tusiart:
+        for i in self.config.tusiart:
             if i is not None:
                 aidraw_instance = AIDRAW6(count=counter, payload=self.payload)
                 counter += 1
@@ -148,7 +148,7 @@ class BaseHandler:
     async def get_seaart_task(self):
         instance_list = []
         counter = 0
-        for i in config.seaart:
+        for i in self.config.seaart:
             if i is not None:
                 aidraw_instance = AIDRAW7(count=counter, payload=self.payload)
                 counter += 1
@@ -159,7 +159,7 @@ class BaseHandler:
     async def get_yunjie_task(self):
         instance_list = []
         counter = 0
-        for i in config.yunjie:
+        for i in self.config.yunjie:
             if i is not None:
                 aidraw_instance = AIDRAW8(count=counter, payload=self.payload)
                 counter += 1
@@ -171,7 +171,7 @@ class BaseHandler:
 
         instance_list = []
         counter = 0
-        for i in config.comfyui['name']:
+        for i in self.config.comfyui['name']:
             aidraw_instance = AIDRAW9(
                 count=counter,
                 payload=self.payload,
@@ -273,7 +273,7 @@ class TaskHandler:
 
     @staticmethod
     def get_backend_name(model_name) -> str:
-        all_model: bytes = redis_client.get('models')
+        all_model: bytes = init_instance.redis_client.get('models')
         all_model: dict = json.loads(all_model.decode('utf-8'))
         for key, models in all_model.items():
             if isinstance(models, list):

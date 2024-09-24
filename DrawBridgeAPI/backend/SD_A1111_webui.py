@@ -2,7 +2,6 @@ from urllib.parse import urlencode
 
 from .base import Backend
 
-import traceback
 
 class AIDRAW(Backend):
 

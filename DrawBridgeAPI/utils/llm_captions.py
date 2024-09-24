@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)
@@ -9,8 +10,9 @@ import torch
 import torch.amp.autocast_mode
 from PIL import Image
 import numpy as np
+from io import BytesIO
 
-from base_config import setup_logger, config
+from ..base_config import init_instance , setup_logger
 
 llm_logger = setup_logger('[LLM-Caption]')
 
@@ -51,6 +53,7 @@ class Joy_caption_load:
         self.model = None
         self.pipeline = JoyPipeline()
         self.pipeline.parent = self
+        self.config = init_instance.config
         pass
 
     def loadCheckPoint(self):
@@ -59,7 +62,7 @@ class Joy_caption_load:
             self.pipeline.clearCache()
 
             # clip
-        model_id = config.server_settings['llm_caption']['clip']
+        model_id = self.config.server_settings['llm_caption']['clip']
 
         model = AutoModel.from_pretrained(model_id)
         clip_processor = AutoProcessor.from_pretrained(model_id)
@@ -74,7 +77,7 @@ class Joy_caption_load:
         clip_model.to("cuda")
 
         # LLM
-        model_path_llm = config.server_settings['llm_caption']['llm']
+        model_path_llm = self.config.server_settings['llm_caption']['llm']
         tokenizer = AutoTokenizer.from_pretrained(model_path_llm, use_fast=False)
         assert isinstance(tokenizer, PreTrainedTokenizer) or isinstance(tokenizer,
                                                                         PreTrainedTokenizerFast), f"Tokenizer is of type {type(tokenizer)}"
@@ -86,7 +89,7 @@ class Joy_caption_load:
 
         image_adapter = ImageAdapter(clip_model.config.hidden_size,
                                      text_model.config.hidden_size)  # ImageAdapter(clip_model.config.hidden_size, 4096)
-        image_adapter.load_state_dict(torch.load(config.server_settings['llm_caption']['image_adapter'], map_location="cpu", weights_only=True))
+        image_adapter.load_state_dict(torch.load(self.config.server_settings['llm_caption']['image_adapter'], map_location="cpu", weights_only=True))
         adjusted_adapter = image_adapter  # AdjustedImageAdapter(image_adapter, text_model.config.hidden_size)
         adjusted_adapter.eval()
         adjusted_adapter.to("cuda")
@@ -191,40 +194,42 @@ class Joy_caption:
         return (r,)
 
 
-def get_joy_cation_instance():
+class JoyCaptionHandler:
+    def __init__(self, config):
+        self.config = config
+        self.pipeline, self.joy_caption = self._initialize()
 
-    joy_caption_load = Joy_caption_load()
-    model_path = config.server_settings['llm_caption']['llm']
+    def _initialize(self):
+        llm_logger.info("LLM加载中")
+        joy_caption_load = Joy_caption_load()
+        model_path = self.config['server_settings']['llm_caption']['llm']
+        pipeline, = joy_caption_load.gen(model_path)
+        joy_caption = Joy_caption()
+        llm_logger.info("LLM加载完成,等待命令")
+        return pipeline, joy_caption
 
-    pipeline, = joy_caption_load.gen(model_path)
+    async def get_caption(self, image, ntags=[]):
+        if image.startswith(b"data:image/png;base64,"):
+            image = image.replace("data:image/png;base64,", "")
+        image = Image.open(BytesIO(base64.b64decode(image))).convert(mode="RGB")
 
-    joy_caption = Joy_caption()
-    return pipeline, joy_caption
+        extra_ = f"do not describe {','.join(ntags)} if it exist" if ntags else ''
+        loop = asyncio.get_event_loop()
 
+        caption = await loop.run_in_executor(
+            None,
+            self.joy_caption.gen,
+            self.pipeline,
+            image,
+            f"A descriptive caption for this image, do not describe a signature or text in the image,{extra_}",
+            300,
+            0.5,
+            True
+        )
 
-def get_caption(
-        pipeline,
-        joy_caption: Joy_caption,
-        image,
-        ntags=[]
-):
-    from io import BytesIO
-    if image.startswith("data:image/png;base64,"):
-        image = image.replace("data:image/png;base64,", "")
-    image = Image.open(BytesIO(base64.b64decode(image))).convert(mode="RGB")
-
-    extra_ = f"do not describe {','.join(ntags)} if it exist" if ntags else ''
-
-    caption = joy_caption.gen(
-        joy_pipeline=pipeline,
-        image=image,
-        prompt=f"A descriptive caption for this image, do not describe a signature or text in the image,{extra_}",
-        max_new_tokens=300,
-        temperature=0.5,
-        cache=True
-    )
-
-    return caption[0]
+        return caption[0]
 
 
-pipeline, joy_caption_instance = get_joy_cation_instance()
+config = init_instance.config
+if config.server_settings['llm_caption']['enable']:
+    joy_caption_handler = JoyCaptionHandler(config)

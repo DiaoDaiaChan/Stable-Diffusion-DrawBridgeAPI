@@ -1,31 +1,32 @@
 import base64
 import os
 import httpx
-
-os.environ['CIVITAI_API_TOKEN'] = 'kunkun'
-os.environ['FAL_KEY'] = 'Daisuki'
-from backend import TaskHandler, Backend
-from utils import request_model, topaz
-
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import HTTPException
-from pathlib import Path
-
 import asyncio
 import time
 import traceback
 import json
-import ui
 import itertools
 import argparse
 import uvicorn
-import threading
 import logging
 import warnings
 import uuid
 import aiofiles
+import gradio
 
+os.environ['CIVITAI_API_TOKEN'] = 'kunkun'
+os.environ['FAL_KEY'] = 'Daisuki'
+path_env = os.getenv("CONF_PATH")
+
+from .backend import TaskHandler, Backend
+from .utils import request_model, topaz, run_later
+from .ui import create_gradio_interface
+from .base_config import setup_logger, init_instance
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.exceptions import HTTPException
+from pathlib import Path
 
 app = FastAPI()
 
@@ -40,11 +41,11 @@ parser.add_argument('--conf', '-c', type=str, default='./config.yaml',
 args = parser.parse_args()
 port = args.port
 host = args.host
-config_file_path = args.conf
+config_file_path = path_env or args.conf
 
-from base_config import init
-init(config_file_path)
-from base_config import setup_logger, redis_client,config
+init_instance.init(config_file_path)
+config = init_instance.config
+redis_client = init_instance.redis_client
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -57,9 +58,6 @@ logging.getLogger("fastapi").disabled = True
 class Api:
     def __init__(self):
         self.app = app
-        self.wd_instance = None
-        self.pipeline = None
-        self.joy_caption_instance = None
         self.backend_instance = Backend()
 
         self.add_api_route(
@@ -96,20 +94,8 @@ class Api:
         )
 
         if config.server_settings['build_in_tagger']:
-            from utils.tagger import WaifuDiffusionInterrogator
 
-            wd_instance = WaifuDiffusionInterrogator(
-                name='WaifuDiffusion',
-                repo_id='SmilingWolf/wd-v1-4-convnextv2-tagger-v2',
-                revision='v2.0',
-                model_path='model.onnx',
-                tags_path='selected_tags.csv'
-            )
-
-            wd_instance.load()
-
-            self.wd_instance = wd_instance
-
+            from .utils.tagger import wd_tagger_handler, wd_logger
             self.add_api_route(
                 "/tagger/v1/interrogate",
                 self.tagger,
@@ -118,25 +104,13 @@ class Api:
             )
 
             if config.server_settings['llm_caption']['enable']:
-                from utils.llm_captions import (
-                    pipeline,
-                    joy_caption_instance,
-                    llm_logger,
-                    get_caption
-                )
-
+                from .utils.llm_captions import llm_logger, joy_caption_handler
                 self.add_api_route(
                     "/llm/caption",
                     self.llm_caption,
                     methods=["POST"],
                     response_model=request_model.TaggerRequest
                 )
-
-                llm_logger.info("LLM加载中")
-
-                self.pipeline = pipeline
-                self.joy_caption_instance = joy_caption_instance
-                llm_logger.info("LLM加载完成,等待命令")
 
         if config.server_settings['build_in_photoai']['exec_path']:
             self.add_api_route(
@@ -200,7 +174,7 @@ class Api:
         path = '/sdapi/v1/sd-models'
 
         task_handler = TaskHandler({}, None, path, reutrn_instance=True)
-        instance_list: list[Backend] = await task_handler.sd_api()
+        instance_list: list[Backend] = await task_handler.txt2img()
 
         for i in instance_list:
             task_list.append(i.get_models())
@@ -220,66 +194,40 @@ class Api:
         redis_client.set('models', json.dumps(redis_resp))
         return api_respond
 
-
     async def tagger(self, request: request_model.TaggerRequest):
-        from utils.tagger import tagger_main, wd_logger
-        data = request.model_dump()
-        caption = await asyncio.get_event_loop().run_in_executor(
-            None,
-            tagger_main,
-            data['image'],
-            data['threshold'],
-            self.wd_instance,
-            data['exclude_tags']
-        )
+        from .utils.tagger import wd_tagger_handler, wd_logger
 
+        data = request.model_dump()
+        base64_image = await self.download_img_from_url(data)
+        caption = await wd_tagger_handler.tagger_main(base64_image, data['threshold'], data['exclude_tags'])
         resp = {}
+
         resp['caption'] = caption
         wd_logger.info(f"打标成功,{caption}")
         return JSONResponse(resp)
 
     async def llm_caption(self, request: request_model.TaggerRequest):
-        from utils.llm_captions import (
-            llm_logger,
-            get_caption
-        )
+
+        from .utils.llm_captions import llm_logger, joy_caption_handler
+        from .utils.tagger import wd_tagger_handler, wd_logger
+
         data = request.model_dump()
-        base64_image = data['image']
-        if data['image'].startswith("http"):
-            image_url = data['image']
-            llm_logger.info(f"检测到url{image_url}")
-            response: httpx.Response = await self.backend_instance.http_request(
-                "POST",
-                image_url,
-                format=False
-            )
-            if response.status_code != 200:
-                llm_logger.warning("图片下载失败!")
-            base64_image = base64.b64encode(response.read())
+        base64_image = await self.download_img_from_url(data)
+
         try:
-            caption = await asyncio.get_event_loop().run_in_executor(
-            None,
-            get_caption,
-            self.pipeline,
-            self.joy_caption_instance,
-            base64_image,
-            data['exclude_tags']
-        )
+            caption = await joy_caption_handler.get_caption(base64_image, data['exclude_tags'])
         except Exception as e:
             traceback.print_exc()
             raise HTTPException(status_code=500, detail=str(e))
 
         resp = {}
+
         resp['llm'] = caption
         llm_logger.info(f"打标成功,{caption}")
-
-        from utils.tagger import tagger_main, wd_logger
-        caption = await asyncio.get_event_loop().run_in_executor(
-            None,
-            tagger_main,
+        caption = await wd_tagger_handler.tagger_main(
             base64_image,
             data['threshold'],
-            self.wd_instance
+            data['exclude_tags']
         )
 
         resp['caption'] = caption
@@ -297,7 +245,6 @@ class Api:
 
     async def topaz_ai(self, request: request_model.TopzAiRequest):
         data = request.model_dump()
-
 
         # 生成唯一的 UUID 目录路径
         unique_id = str(uuid.uuid4())
@@ -345,6 +292,26 @@ class Api:
         else:
             raise HTTPException(status_code=500, detail=f"Error: {error}")
 
+    async def download_img_from_url(self, data):
+
+        base64_image = data['image']
+
+        if data['image'].startswith("http"):
+            image_url = data['image']
+            logger.info(f"检测到url: {image_url}")
+            response: httpx.Response = await self.backend_instance.http_request(
+                "GET",
+                image_url,
+                format=False
+            )
+
+            if response.status_code != 200:
+                logger.warning("图片下载失败!")
+
+            base64_image = base64.b64encode(response.read())
+
+        return base64_image
+
 
 api_instance = Api()
 
@@ -354,23 +321,24 @@ async def _(request):
     pass
 
 
-@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def proxy(path: str, request: Request):
-    client_host = request.client.host
-
-    task_handler = TaskHandler({}, request, path)
-
-    try:
-        logger.info(f"开始进行转发 - {client_host}")
-        result = await task_handler.sd_api()
-    except Exception as e:
-        logger.error(traceback.format_exc())
-        raise HTTPException(500, detail=str(e))
-
-    if result is None:
-        raise HTTPException(500, detail='Result not found')
-
-    return result
+#
+# @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+# async def proxy(path: str, request: Request):
+#     client_host = request.client.host
+#
+#     task_handler = TaskHandler({}, request, path)
+#
+#     try:
+#         logger.info(f"开始进行转发 - {client_host}")
+#         result = await task_handler.sd_api()
+#     except Exception as e:
+#         logger.error(traceback.format_exc())
+#         raise HTTPException(500, detail=str(e))
+#
+#     if result is None:
+#         raise HTTPException(500, detail='Result not found')
+#
+#     return result
 
 
 @app.get("/backend-control")
@@ -378,16 +346,9 @@ async def get_backend_control(backend: str, key: str, value: bool):
     pass
 
 
-threading.Thread(
-    target=uvicorn.run,
-    args=(app,),
-    kwargs={
-        "host": host,
-        "port": port,
-        "log_level": "critical"
-    }
-).start()
+if __name__ == "__main__":
+    asyncio.run(run_later(lambda: httpx.get(f"http://{host}:{port}/sdapi/v1/sd-models"), 3))
 
-asyncio.run(ui.run_gradio(host, port))
-
-
+    demo = create_gradio_interface(host, port)
+    app = gradio.mount_gradio_app(api_instance.app, demo, path="/")
+    uvicorn.run(app, host=host, port=port, log_level="critical")

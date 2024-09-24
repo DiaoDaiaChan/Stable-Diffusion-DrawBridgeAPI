@@ -2,8 +2,6 @@ import asyncio
 import json
 import traceback
 
-import aiohttp
-
 from .base import Backend
 
 

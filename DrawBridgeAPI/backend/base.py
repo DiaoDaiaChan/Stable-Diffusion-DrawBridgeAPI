@@ -17,9 +17,9 @@ from io import BytesIO
 from pathlib import Path
 from datetime import datetime
 
-from base_config import setup_logger
-from base_config import redis_client, config
-from utils import http_request, exceptions
+from ..base_config import setup_logger
+from ..base_config import init_instance
+from ..utils import http_request, exceptions
 
 class Backend:
 
@@ -85,7 +85,7 @@ class Backend:
         self.login = login  # 是否需要登录后端
         self.token = token  # 后端token
         self.count = count  # 适用于后端的负载均衡中遍历的后端编号
-        self.config = config  # 配置文件
+        self.config = init_instance.config  # 配置文件
         self.backend_name = ''  # 后端名称
         self.current_config = None  # 当前后端的配置
 
@@ -104,7 +104,7 @@ class Backend:
 
         self.logger = None
         self.setup_logger = setup_logger
-        self.redis_client = redis_client
+        self.redis_client = init_instance.redis_client
 
         self.parameters = None  # 图片元数据
         self.post_event = None
@@ -579,6 +579,7 @@ class Backend:
             timeout=300,
             verify=True
     ) -> json or httpx.Response:
+
         async with httpx.AsyncClient(verify=verify) as client:
             try:
                 response = await client.request(
@@ -619,7 +620,7 @@ class Backend:
         获取生图结果的函数
         :return: 类A1111 webui返回值
         """
-        total_retry = config.retry_times
+        total_retry = self.config.retry_times
 
         for retry_times in range(total_retry):
             self.start_time = time.time()
@@ -898,15 +899,14 @@ class Backend:
                     f"{self.backend_url}/sdapi/v1/sd-models",
                 )
             except Exception:
-                self.logger.warning(f"获取模型失败，错误信息: {traceback.format_exc()}")
-                respond = f"获取模型失败，错误信息: {traceback.format_exc()}"
+                self.logger.warning(f"获取模型失败")
+                respond = self.format_models_resp()
 
-            finally:
-                backend_to_models_dict = {
-                    self.workload_name: respond
-                }
+            backend_to_models_dict = {
+                self.workload_name: respond
+            }
 
-                return backend_to_models_dict
+            return backend_to_models_dict
 
 
 
