@@ -1,6 +1,6 @@
 civitai_setting: # civitai API token
   token:
-    - 1
+    - You token here
   model:
     ''
   proxy:
@@ -26,12 +26,12 @@ a1111webui_setting:   # sd_webui 设置
     - 1572864
 fal_ai_setting: # {"token": []}
   token:  # 
-    - 1
+    - You token here
   model:
     ''
 replicate_setting: # {"token": []}
   token:  # https://replicate.com/black-forest-labs/flux-schnell
-    - 1
+    - You token here
   model:
     ''
 liblibai_setting:
@@ -91,12 +91,12 @@ tusiart_setting:
     - https://tusiart.com/u/759763664390847335
 seaart_setting:
   token:
-    - 1
+    - You token here
   model:
     -
 yunjie_setting:
   token:
-    - 1
+    - You token here
   model:
     -
   note:

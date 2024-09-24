@@ -189,32 +189,31 @@ class Api:
 
     @staticmethod
     async def get_sd_models():
-        try:
-            task_list = []
-            path = '/sdapi/v1/sd-models'
 
-            task_handler = TaskHandler({}, None, path, reutrn_instance=True)
-            instance_list: list[Backend] = await task_handler.sd_api()
+        task_list = []
+        path = '/sdapi/v1/sd-models'
 
-            for i in instance_list:
-                task_list.append(i.get_models())
-            resp = await asyncio.gather(*task_list)
+        task_handler = TaskHandler({}, None, path, reutrn_instance=True)
+        instance_list: list[Backend] = await task_handler.sd_api()
 
-            models_dict = {}
-            api_respond = []
-            for i in resp:
-                models_dict = models_dict | i
-                api_respond = api_respond + list(i.values())
+        for i in instance_list:
+            task_list.append(i.get_models())
+        resp = await asyncio.gather(*task_list)
 
-            api_respond = list(itertools.chain.from_iterable(api_respond))
+        models_dict = {}
+        api_respond = []
+        for i in resp:
+            models_dict = models_dict | i
+            api_respond = api_respond + list(i.values())
 
-            redis_resp: bytes = redis_client.get('models')
-            redis_resp: dict = json.loads(redis_resp.decode('utf-8'))
-            redis_resp.update(models_dict)
-            redis_client.set('models', json.dumps(redis_resp))
-            return api_respond
-        except:
-            traceback.print_exc()
+        api_respond = list(itertools.chain.from_iterable(api_respond))
+
+        redis_resp: bytes = redis_client.get('models')
+        redis_resp: dict = json.loads(redis_resp.decode('utf-8'))
+        redis_resp.update(models_dict)
+        redis_client.set('models', json.dumps(redis_resp))
+        return api_respond
+
 
     async def tagger(self, request: request_model.TaggerRequest):
         from utils.tagger import tagger_main, wd_logger
