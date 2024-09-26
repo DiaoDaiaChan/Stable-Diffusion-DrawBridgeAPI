@@ -276,5 +276,3 @@ def init(config_file_path='./config.yaml'):
     rp.set('workload', workload_json)
     rp.set('models', json.dumps(models_dict))
     rp.execute()
-
-init()

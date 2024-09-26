@@ -1,6 +1,6 @@
 [project]
 name = "stable-diffusion-drawbridge-api"
-version = "0.1"
+version = "1.0"
 description = "使用标准A1111-SDWEBUI API来调用各种绘画后端的多功能负载均衡API"
 authors = [
     {name = "DiaoDaiaChan", email = "diaodaiachan@qq.com"},
@@ -24,6 +24,9 @@ dependencies = [
     "tqdm",
     "uvicorn",
 ]
+
+[tool.pdm]
+includes = ["DrawBridgeAPI"]
 
 requires-python = ">=3.10"
 readme = "README.md"
