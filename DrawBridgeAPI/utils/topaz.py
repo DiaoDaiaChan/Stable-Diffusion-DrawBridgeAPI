@@ -1,5 +1,5 @@
 import subprocess
-from base_config import config, setup_logger
+from ..base_config import init_instance, setup_logger
 
 topazai_logger = setup_logger('[TopaAI]')
 
@@ -12,7 +12,7 @@ def run_tpai(
          lighting=None, color=None, **kwargs
 ):
     # 基本命令和输入文件夹
-    command = [rf'"{config.server_settings["build_in_photoai"]["exec_path"]}"', f'"{input_folder}"']
+    command = [rf'"{init_instance.config.server_settings["build_in_photoai"]["exec_path"]}"', f'"{input_folder}"']
 
     # 输出文件夹
     if output_folder:

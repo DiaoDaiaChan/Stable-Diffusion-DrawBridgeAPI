@@ -4,7 +4,6 @@ import os
 import replicate
 
 from io import BytesIO
-from PIL import Image
 
 from .base import Backend
 

@@ -2,6 +2,8 @@ import asyncio
 import copy
 import json
 import traceback
+from pathlib import Path
+import os
 
 from .base import Backend
 
@@ -22,7 +24,8 @@ class AIDRAW(Backend):
         self.backend_url = self.current_config['backend_url'][self.count]
 
         if self.comfyui_api_json:
-            with open(f"comfyui_workflows/{self.comfyui_api_json}.json", 'r') as f:
+
+            with open(Path(f"{os.path.dirname(os.path.abspath(__file__))}/../comfyui_workflows/{self.comfyui_api_json}.json").resolve(), 'r') as f:
                 self.comfyui_api_json = json.load(f)
 
     async def heart_beat(self, id_):

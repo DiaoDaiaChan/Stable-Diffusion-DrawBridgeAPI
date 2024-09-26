@@ -1,6 +1,6 @@
 civitai_setting: # civitai API token
   token:
-    - 1
+    - You token here
   model:
     ''
   proxy:
@@ -26,12 +26,12 @@ a1111webui_setting:   # sd_webui 设置
     - 1572864
 fal_ai_setting: # {"token": []}
   token:  # 
-    - 1
+    - You token here
   model:
     ''
 replicate_setting: # {"token": []}
   token:  # https://replicate.com/black-forest-labs/flux-schnell
-    - 1
+    - You token here
   model:
     ''
 liblibai_setting:
@@ -39,18 +39,23 @@ liblibai_setting:
   token:  # 
     - d812c12d83c640...
     - 只要token填上了也算一个后端哦
+    - token3
 # 模型id获取方法 https://www.liblib.art/sd 先选择喜欢的模型 先按下F12 再 生图
 # 回到开发者控制台,网络选项 -> 找到名为 image 的请求,点击 负载 ， 请求负载 找到 checkpointId
   model:  # 模型id
     - 2332049
-    - 1135059
+    - 2676318
+    - 2675606
   model_name:  # 模型名字，仅用作标记
-    - "DiaoDaiaMix - 二次元风格"
-    - "Colorful Anime XL 彩璃二次元XL"
+    - "liblib.art/modelinfo/d2f55cf374a7431cac13382182aed20c"
+    - "liblib.art/modelinfo/5ecc3218f1ef483ab63eeb4e4cff30cc"
+    - "liblib.art/modelinfo/fe3aac47589d4a20b24d0a6b045d607e"
   xl:  # 是否为XL模型
     - false
     - true
+    - false
   flux:  # 是否为FLUX模型
+    - false
     - false
     - false
   preference:
@@ -65,7 +70,6 @@ liblibai_setting:
           - ''
           - ''
       steps: 20  # 步数
-
     - pretags:
         1.5:
           - ''
@@ -76,7 +80,19 @@ liblibai_setting:
         flux:
           - ''
           - ''
-      steps: 12
+      steps: 20
+    - pretags:
+        1.5:
+          - ''
+          - ''
+        xl:
+          - ""
+          - ""
+        flux:
+          - ''
+          - ''
+      steps: 20
+
 tusiart_setting:  
 # 注意，有两个必填项，一个是token，一个是referer
 # https://tusiart.com/ 
@@ -90,13 +106,15 @@ tusiart_setting:
   referer:  # 你的用户首页! 点击右上角头像，复制链接 必填！！
     - https://tusiart.com/u/759763664390847335
 seaart_setting:
+# https://www.seaart.ai/ # 登录 按下F12 -> 应用 -> cookies -> https://www.seaart.ai -> T 的值 eyJhbGciOiJI....
   token:
-    - 1
+    - You token here
   model:
     -
 yunjie_setting:
+# https://www.yunjie.art/ # 登录 按下F12 -> 应用 -> cookies -> https://www.yunjie.art -> rayvision_aigc_token 的值 rsat:9IS5EH6vY
   token:
-    - 1
+    - You token here
   model:
     -
   note:
@@ -138,6 +156,12 @@ server_settings:
   build_in_photoai:
     exec_path:
       "C:\\Program Files\\Topaz Labs LLC\\Topaz Photo AI\\tpai.exe"
+
+  start_gradio:
+    False
+  same_port_with_api:
+    False
+
 
 backend_name_list:  # 不要动！
   - civitai

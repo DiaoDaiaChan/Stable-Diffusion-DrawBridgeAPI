@@ -8,8 +8,7 @@ fastapi
 fal-client
 httpx
 piexif
-pydantic==2.8.2
-pydantic-settings==2.4.0
+pydantic
 PyYAML
 redis
 replicate

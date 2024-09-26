@@ -1,13 +1,13 @@
 import json
-
+import asyncio
 import gradio as gr
 from PIL import Image
 
 import io
 import base64
 import httpx
-from base_config import logger
-from backend import TaskHandler
+from ..base_config import init_instance
+from ..backend import TaskHandler
 
 
 class Gradio:
@@ -15,10 +15,6 @@ class Gradio:
         self.host = '127.0.0.1' if host == '0.0.0.0' else host
         self.port = port
 
-    def get_all_models(self):
-        all_models_list = httpx.get(f"http://{self.host}:{self.port}/sdapi/v1/sd-models").json()
-        print(all_models_list)
-        return [i['title'] for i in all_models_list]
 
     def get_caption(self, image):
         caption = httpx.post(
@@ -34,14 +30,14 @@ def format_caption_output(caption_result):
     return llm_text, word_scores, word_
 
 
-async def create_gradio_interface(host, port):
+def create_gradio_interface(host, port):
 
     gradio_api = Gradio(host, port)
+    from ..api_server import api_instance
+    all_models = [i['title'] for i in asyncio.run(api_instance.get_sd_models())]
+    init_instance.logger.info(f"服务器准备就绪! Listen on {host}:{port}")
 
-    all_models = gradio_api.get_all_models()
-    logger.info(f"服务器准备就绪! Listen on {host}:{port}")
-
-    async def get_image(model, prompt, negative_prompt, width, height, cfg_scale, steps):
+    def get_image(model, prompt, negative_prompt, width, height, cfg_scale, steps):
 
         payload = {
             "prompt": prompt,
@@ -53,7 +49,7 @@ async def create_gradio_interface(host, port):
         }
 
         task_handler = TaskHandler(payload, model_to_backend=model)
-        result = await task_handler.txt2img()
+        result = asyncio.get_running_loop().run_in_executor(None, task_handler.txt2img)
         image_data = result.get("images")[0]
         image = Image.open(io.BytesIO(base64.b64decode(image_data)))
         return image
@@ -98,6 +94,6 @@ async def create_gradio_interface(host, port):
     return demo
 
 
-async def run_gradio(host, port):
-    interface = await create_gradio_interface(host, port)
-    interface.launch(server_name=host, server_port=port + 1)
+def run_gradio(host, port):
+    interface = create_gradio_interface(host, port)
+    interface.launch(server_name=host, server_port=port+1)

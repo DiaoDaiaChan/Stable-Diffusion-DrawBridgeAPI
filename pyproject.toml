@@ -8,7 +8,7 @@ authors = [
 dependencies = [
     "aiohttp",
     "aiofiles",
-    "Pillow==10.4.0",
+    "Pillow>=10.4.0",
     "civitai-py",
     "civitai",
     "colorama",
@@ -16,8 +16,7 @@ dependencies = [
     "fal-client",
     "httpx",
     "piexif",
-    "pydantic==2.8.2",
-    "pydantic-settings==2.4.0",
+    "pydantic",
     "PyYAML",
     "redis",
     "replicate",

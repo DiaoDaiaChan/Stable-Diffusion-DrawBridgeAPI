@@ -1,12 +1,9 @@
 import traceback
 import piexif
-import asyncio
 import fal_client
 import os
 
 from io import BytesIO
-from PIL import Image
-
 from .base import Backend
 
 
