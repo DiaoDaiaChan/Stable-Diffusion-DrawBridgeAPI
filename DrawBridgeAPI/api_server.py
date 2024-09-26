@@ -243,16 +243,16 @@ class Api:
     async def get_options(self):
         return JSONResponse(self.backend_instance.format_options_api_resp())
 
-    async def topaz_ai(self, request: request_model.TopzAiRequest):
+    @staticmethod
+    async def topaz_ai(request: request_model.TopzAiRequest):
         data = request.model_dump()
 
-        # 生成唯一的 UUID 目录路径
         unique_id = str(uuid.uuid4())
         save_dir = Path("saved_images") / unique_id
         processed_dir = save_dir / 'processed'
         save_dir.mkdir(parents=True, exist_ok=True)
         del data['output_folder']
-        # 保存图像到生成的文件夹中
+
         try:
 
             if data['image']:
@@ -321,24 +321,23 @@ async def _(request):
     pass
 
 
-#
-# @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-# async def proxy(path: str, request: Request):
-#     client_host = request.client.host
-#
-#     task_handler = TaskHandler({}, request, path)
-#
-#     try:
-#         logger.info(f"开始进行转发 - {client_host}")
-#         result = await task_handler.sd_api()
-#     except Exception as e:
-#         logger.error(traceback.format_exc())
-#         raise HTTPException(500, detail=str(e))
-#
-#     if result is None:
-#         raise HTTPException(500, detail='Result not found')
-#
-#     return result
+@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy(path: str, request: Request):
+    client_host = request.client.host
+
+    task_handler = TaskHandler({}, request, path)
+
+    try:
+        logger.info(f"开始进行转发 - {client_host}")
+        result = await task_handler.sd_api()
+    except Exception as e:
+        logger.error(traceback.format_exc())
+        raise HTTPException(500, detail=str(e))
+
+    if result is None:
+        raise HTTPException(500, detail='Result not found')
+
+    return result
 
 
 @app.get("/backend-control")
@@ -349,6 +348,7 @@ async def get_backend_control(backend: str, key: str, value: bool):
 if __name__ == "__main__":
     asyncio.run(run_later(lambda: httpx.get(f"http://{host}:{port}/sdapi/v1/sd-models"), 3))
 
-    demo = create_gradio_interface(host, port)
-    app = gradio.mount_gradio_app(api_instance.app, demo, path="/")
+    if config.server_settings['start_gradio']:
+        demo = create_gradio_interface(host, port)
+        app = gradio.mount_gradio_app(api_instance.app, demo, path="/")
     uvicorn.run(app, host=host, port=port, log_level="critical")

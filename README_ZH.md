@@ -50,11 +50,9 @@ python -m venv venv
 复制 `config_example.yaml` 为 `config.yaml`  
 [查看详细说明](DrawBridgeAPI/config_example.yaml)
 
-#### 启动  
-请注意工作目录必须是 `DrawBridgeAPI` 目录！  
+#### 启动
 ```
-cd DrawBridgeAPI
-..\venv\Scripts\python api_server.py --port=8000 --host=127.0.0.1
+.\venv\Scripts\python.exe -m DrawBridgeAPI.api_server --port=8000 --host=127.0.0.1 --conf .\DrawBridgeAPI\config.yaml
 ```
 
 #### 访问  
