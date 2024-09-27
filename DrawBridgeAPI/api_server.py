@@ -351,4 +351,5 @@ if __name__ == "__main__":
     if config.server_settings['start_gradio']:
         demo = create_gradio_interface(host, port)
         app = gradio.mount_gradio_app(api_instance.app, demo, path="/")
-    uvicorn.run(app, host=host, port=port, log_level="critical")
+
+    uvicorn.run(api_instance.app, host=host, port=port, log_level="critical")
