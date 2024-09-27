@@ -24,6 +24,9 @@ dependencies = [
     "uvicorn",
 ]
 
+[tool.pdm]
+includes = ["DrawBridgeAPI"]
+
 requires-python = ">=3.10"
 readme = "README.md"
 license = {text = "MIT"}
