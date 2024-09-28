@@ -19,7 +19,8 @@ else:
         from pydantic_settings import BaseSettings
     except:
         traceback.print_exc()
-        os.system("python -m pip install pydantic_settings")
+        import subprocess
+        subprocess.run([sys.executable, "-m", "pip", "install", "pydantic_settings"])
         print("请重启 / please restart")
 
         sys.exit()

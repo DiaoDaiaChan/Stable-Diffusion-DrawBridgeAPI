@@ -649,6 +649,8 @@ class Backend:
                     self.result = JSONResponse(content=resp, status_code=response.status_code)
                 else:
                     await self.posting()
+                    if self.config['server_settings']['enable_nsfw_check']:
+                        await self.pic_audit()
                 break
 
             except Exception as e:
@@ -908,11 +910,32 @@ class Backend:
 
             return backend_to_models_dict
 
+    async def pic_audit(self):
+        from PIL import Image, ImageDraw, ImageFont
+        import base64
+        from io import BytesIO
+        from ..utils.tagger import wd_tagger_handler
+        new_image_list = []
+        for i in self.result['images']:
+            is_nsfw = await wd_tagger_handler.tagger_main(i, 0.35, [], True)
 
+            if is_nsfw:
+                img = Image.new('RGB', (512, 512), color=(0, 0, 0))
+                draw = ImageDraw.Draw(img)
+                self.logger.info("检测到违规内容")
+                text = "检测到违规内容"
+                font = ImageFont.load_default()
+                text_width, text_height = draw.textsize(text, font=font)
+                position = ((512 - text_width) // 2, (512 - text_height) // 2)
+                draw.text(position, text, fill=(255, 255, 255), font=font)
 
+                buffered = BytesIO()
+                img.save(buffered, format="PNG")
 
+                img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+                new_image_list.append(img_base64)
+            else:
+                new_image_list.append(i)
 
-
-
-
+        self.result['images'] = new_image_list
 

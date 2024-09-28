@@ -253,7 +253,9 @@ class Api:
     async def set_options(request: request_model.SetConfigRequest):
 
         data = request.model_dump()
-        StaticHandler.set_lock_to_backend(data.get('sd_model_checkpoint'))
+        if data.get('sd_model_checkpoint', None):
+            logger.info("设置已经锁定后端")
+            StaticHandler.set_lock_to_backend(data.get('sd_model_checkpoint'))
 
         return
 
@@ -271,7 +273,7 @@ class Api:
 
             if data['image']:
                 base64_image = data['image']
-                input_image_path = save_dir / f"{unique_id}_image.png"  # 假设保存为 PNG 文件
+                input_image_path = save_dir / f"{unique_id}_image.png"
                 async with aiofiles.open(input_image_path, "wb") as image_file:
                     await image_file.write(base64.b64decode(base64_image))
                 output, error, return_code = await asyncio.get_running_loop().run_in_executor(
@@ -290,8 +292,8 @@ class Api:
                 )
         except:
             traceback.print_exc()
+            raise HTTPException(status_code=500, detail="Error occurred while processing the image.")
 
-        # 检查处理结果并读取生成的图像文件
         if return_code == 0:
             files = list(processed_dir.glob("*"))
 

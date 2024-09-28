@@ -138,7 +138,7 @@ server_settings:
     - 127.0.0.1  # 地址
     - 6379  # 端口
     - null  # redis 密码
-  enable_nsfw_check:  # 暂时没写
+  enable_nsfw_check:
     false  
   save_image:  # 是否直接保存图片
     true
@@ -161,6 +161,16 @@ server_settings:
     False
   same_port_with_api:
     False
+  prompt_audit:
+    enable:
+      False
+    site:
+      api.openai.com
+    api_key:
+      null
+    http_proxy:
+      null
+
 
 
 backend_name_list:  # 不要动！

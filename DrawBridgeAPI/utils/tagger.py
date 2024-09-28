@@ -214,7 +214,7 @@ class WaifuDiffusionTaggerHandler:
         wd_logger.info("模型加载完成")
         return wd_instance
 
-    async def tagger_main(self, base64_img, threshold, ntags=[]):
+    async def tagger_main(self, base64_img, threshold, ntags=[], audit=False, ratings=False):
         if base64_img.startswith(b"data:image/png;base64,"):
             base64_img = base64_img.replace("data:image/png;base64,", "")
 
@@ -227,6 +227,14 @@ class WaifuDiffusionTaggerHandler:
             self.wd_instance.interrogate,
             image
         )
+        if ratings:
+            return ratings
+        if audit:
+            possibilities = ratings
+            value = list(possibilities.values())
+            value.sort(reverse=True)
+            reverse_dict = {value: key for key, value in possibilities.items()}
+            return True if reverse_dict[value[0]] == "questionable" or reverse_dict[value[0]] == "explicit" else False
 
         # 处理标签
         processed_tags = Interrogator.postprocess_tags(
