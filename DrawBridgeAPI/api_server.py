@@ -13,12 +13,13 @@ import warnings
 import uuid
 import aiofiles
 import gradio
+import threading
 
 os.environ['CIVITAI_API_TOKEN'] = 'kunkun'
 os.environ['FAL_KEY'] = 'Daisuki'
 path_env = os.getenv("CONF_PATH")
 
-from .backend import TaskHandler, Backend
+from .backend import TaskHandler, Backend, StaticHandler
 from .utils import request_model, topaz, run_later
 from .ui import create_gradio_interface
 from .base_config import setup_logger, init_instance
@@ -91,6 +92,11 @@ class Api:
             "/sdapi/v1/options",
             self.get_options,
             methods=["GET"]
+        )
+        self.add_api_route(
+            "/sdapi/v1/options",
+            self.set_options,
+            methods=["POST"]
         )
 
         if config.server_settings['build_in_tagger']:
@@ -173,7 +179,7 @@ class Api:
         task_list = []
         path = '/sdapi/v1/sd-models'
 
-        task_handler = TaskHandler({}, None, path, reutrn_instance=True)
+        task_handler = TaskHandler({}, None, path, reutrn_instance=True, override_model_select=True)
         instance_list: list[Backend] = await task_handler.txt2img()
 
         for i in instance_list:
@@ -242,6 +248,14 @@ class Api:
 
     async def get_options(self):
         return JSONResponse(self.backend_instance.format_options_api_resp())
+
+    @staticmethod
+    async def set_options(request: request_model.SetConfigRequest):
+
+        data = request.model_dump()
+        StaticHandler.set_lock_to_backend(data.get('sd_model_checkpoint'))
+
+        return
 
     @staticmethod
     async def topaz_ai(request: request_model.TopzAiRequest):
@@ -345,8 +359,14 @@ async def get_backend_control(backend: str, key: str, value: bool):
     pass
 
 
+@app.on_event("startup")
+async def startup_event():
+    logger.info('请等待API初始化')
+    await api_instance.get_sd_models()
+    logger.info('API初始化成功')
+
+
 if __name__ == "__main__":
-    asyncio.run(run_later(lambda: httpx.get(f"http://{host}:{port}/sdapi/v1/sd-models"), 3))
 
     if config.server_settings['start_gradio']:
         demo = create_gradio_interface(host, port)

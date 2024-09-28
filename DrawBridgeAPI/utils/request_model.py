@@ -143,3 +143,8 @@ class TopzAiRequest(BaseModel):
     sharpen: Optional[bool] = None
     lighting: Optional[bool] = None
     color: Optional[bool] = None
+
+
+class SetConfigRequest(BaseModel):
+    class Config:
+        extra = "allow"

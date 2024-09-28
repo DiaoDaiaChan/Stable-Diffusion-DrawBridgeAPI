@@ -247,7 +247,19 @@ class ComfyuiHandler(BaseHandler):
         return self.instance_list, self.enable_backend
 
 
-class TaskHandler:
+class StaticHandler:
+    lock_to_backend = None
+
+    @classmethod
+    def set_lock_to_backend(cls, selected_model: str):
+        cls.lock_to_backend = selected_model
+
+    @classmethod
+    def get_lock_to_backend(cls):
+        return cls.lock_to_backend
+
+
+class TaskHandler(StaticHandler):
 
     def __init__(
         self,
@@ -258,7 +270,8 @@ class TaskHandler:
         reutrn_instance: bool = False,
         model_to_backend: str = None,
         disable_loadbalance: bool = False,
-        comfyui_json: Path = None
+        comfyui_json: Path = None,
+        override_model_select: bool = False,
     ):
         self.payload = payload
         self.instance_list = []
@@ -268,8 +281,9 @@ class TaskHandler:
         self.enable_backend = None
         self.reutrn_instance = reutrn_instance
         self.select_backend = select_backend
-        self.model_to_backend = model_to_backend
+        self.model_to_backend = model_to_backend  # 模型的名称
         self.disable_loadbalance = disable_loadbalance
+        self.lock_to_backend = self.get_lock_to_backend() if override_model_select is False else None
 
     @staticmethod
     def get_backend_name(model_name) -> str:
@@ -278,7 +292,7 @@ class TaskHandler:
         for key, models in all_model.items():
             if isinstance(models, list):
                 for model in models:
-                    if model.get("title") == model_name:
+                    if model.get("title") == model_name or model.get("model_name") == model_name:
                         return key
 
     @staticmethod
@@ -329,6 +343,7 @@ class TaskHandler:
         slice = [24]
 
         logger = setup_logger(custom_prefix='[LOAD_BALANCE]')
+
         if self.reutrn_instance:
             self.result = self.instance_list
             return
@@ -336,13 +351,18 @@ class TaskHandler:
             task = i.get_backend_working_progress()
             tasks.append(task)
         # 获取api队列状态
-        key = self.get_backend_name(self.model_to_backend)
+        key = self.get_backend_name(self.model_to_backend or self.lock_to_backend)
         if self.model_to_backend and key is not None:
 
-            key = self.get_backend_name(self.model_to_backend)
             backend_index = self.get_backend_index(backend_url_dict, key)
             logger.info(f"手动选择模型{self.model_to_backend}, 已选择后端{key[:24]}")
             self.result = await self.instance_list[backend_index].send_result_to_api()
+
+        elif self.lock_to_backend:
+            if self.lock_to_backend and key is not None:
+                backend_index = self.get_backend_index(backend_url_dict, key)
+                logger.info(f"锁定后端{key[:24]}")
+                self.result = await self.instance_list[backend_index].send_result_to_api()
 
         else:
             all_resp = await asyncio.gather(*tasks, return_exceptions=True)
@@ -411,4 +431,6 @@ class TaskHandler:
             ava_url_index = list(backend_url_dict.values()).index(ava_url)
             # ava_url_tuple = (ava_url, reverse_dict[ava_url], all_resp, len(normal_backend), vram_dict[ava_url])
             self.result = await self.instance_list[ava_url_index].send_result_to_api()
+
+
 

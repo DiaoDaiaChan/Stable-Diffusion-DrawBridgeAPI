@@ -131,7 +131,7 @@ server_settings:
   # 怎么数呢？ 比如在这个配置文件中 civitai 的第一个token是 0 a1111 的第一个后端是 1 , 第二个是2
   # 所以 enable_txt2img_backends: [0,1] 表示启动 civitai第一个token 和 a1111的第一个后端
   # 再比如 enable_txt2img_backends: [3, 4, 5] 表示启动 liblib 的所有两个token 和 tusiart的第一个token
-  enable_txt2img_backends: [5,6,7,8,9,10,11]
+  enable_txt2img_backends: [5,6,7]
   enable_img2img_backends: [1]
   enable_sdapi_backends: [1]
   redis_server:  # 必填 Redis服务器
