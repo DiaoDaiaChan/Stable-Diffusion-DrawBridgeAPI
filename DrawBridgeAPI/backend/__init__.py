@@ -20,6 +20,7 @@ from .tusiart import AIDRAW as AIDRAW6
 from .seaart import AIDRAW as AIDRAW7
 from .yunjie import AIDRAW as AIDRAW8
 from .comfyui import AIDRAW as AIDRAW9
+from .novelai import AIDRAW as AIDRAW10
 from .base import Backend
 
 
@@ -59,7 +60,8 @@ class BaseHandler:
             self.get_tusiart_task(),
             self.get_seaart_task(),
             self.get_yunjie_task(),
-            self.get_comfyui_task()
+            self.get_comfyui_task(),
+            self.get_novelai_task()
         ]
 
         all_backend_instance = await asyncio.gather(*tasks)
@@ -171,6 +173,15 @@ class BaseHandler:
 
         instance_list = []
         counter = 0
+
+        hr_mode = self.payload.get('enable_hr', None)
+
+        self.comfyui_task = "sdbase_txt2img_hr_fix" if hr_mode else "sdbase_txt2img"
+
+        img2img = self.payload.get("init_images", [])
+        if img2img:
+            self.comfyui_task = "sdbase_img2img"
+
         for i in self.config.comfyui['name']:
             aidraw_instance = AIDRAW9(
                 count=counter,
@@ -178,6 +189,20 @@ class BaseHandler:
                 request=self.request,
                 path=self.path,
                 comfyui_api_json=self.comfyui_task
+            )
+            counter += 1
+            instance_list.append(aidraw_instance)
+
+        return instance_list
+
+    async def get_novelai_task(self):
+
+        instance_list = []
+        counter = 0
+        for i in self.config.novelai:
+            aidraw_instance = AIDRAW10(
+                count=counter,
+                payload=self.payload
             )
             counter += 1
             instance_list.append(aidraw_instance)
@@ -366,6 +391,7 @@ class TaskHandler(StaticHandler):
 
         else:
             all_resp = await asyncio.gather(*tasks, return_exceptions=True)
+            logger.warning(all_resp)
             logger.info('开始进行后端选择')
             for resp_tuple in all_resp:
                 e += 1

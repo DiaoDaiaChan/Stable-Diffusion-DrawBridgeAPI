@@ -52,10 +52,12 @@ class AIDRAW(Backend):
                 await self.set_backend_working_status(available=True)
                 for i in images:
                     if 'porn' in i['previewPath']:
-                        raise RuntimeError("API侧检测到NSFW图片")
-                    self.logger.img(f"图片url: {i['previewPath']}")
-                    self.img_url.append(i['previewPath'])
-                    self.comment = i['imageInfo']
+                        self.nsfw_detected = True
+                        self.logger.warning("API侧检测到NSFW图片")
+                    else:
+                        self.logger.img(f"图片url: {i['previewPath']}")
+                        self.img_url.append(i['previewPath'])
+                        self.comment = i['imageInfo']
                 break
 
     async def update_progress(self):
@@ -84,7 +86,10 @@ class AIDRAW(Backend):
 
     async def formating_to_sd_style(self):
 
-        await self.download_img()
+        if self.nsfw_detected:
+            await self.return_nsfw_image()
+        else:
+            await self.download_img()
 
         self.format_api_respond()
 
@@ -127,7 +132,7 @@ class AIDRAW(Backend):
                     "seed": self.seed,
                     "randnSource": 0,
                     "samplingMethod": 31,
-                    "imgCount": self.total_img_count,
+                    "imgCount": self.batch_size,
                     "samplingStep": self.steps,
                     "cfgScale": self.scale,
                     "width": self.width,
@@ -156,7 +161,7 @@ class AIDRAW(Backend):
                     "samplingStep": self.steps,
                     "width": self.width,
                     "height": self.height,
-                    "imgCount": self.total_img_count,
+                    "imgCount": self.batch_size,
                     "cfgScale": self.scale,
                     "seed": self.seed,
                     "seedExtra": 0,
@@ -194,6 +199,7 @@ class AIDRAW(Backend):
         self.headers.update(new_headers)
 
         await self.set_backend_working_status(available=False)
+
         response = await self.http_request(
             method="POST",
             target_url="https://liblib-api.vibrou.com/gateway/sd-api/generate/image",
@@ -214,4 +220,5 @@ class AIDRAW(Backend):
             await self.heart_beat(task_id)
 
         await self.formating_to_sd_style()
+
 

@@ -202,7 +202,7 @@ class JoyCaptionHandler:
     def _initialize(self):
         llm_logger.info("LLM加载中")
         joy_caption_load = Joy_caption_load()
-        model_path = self.config['server_settings']['llm_caption']['llm']
+        model_path = self.config.server_settings['llm_caption']['llm']
         pipeline, = joy_caption_load.gen(model_path)
         joy_caption = Joy_caption()
         llm_logger.info("LLM加载完成,等待命令")

@@ -58,6 +58,7 @@ async def txt_audit(
         {"role": "system",
          "content": prompt}
     ]
+
     prompt = [{"role": "user", "content": msg}]
 
     try:
@@ -80,6 +81,7 @@ async def txt_audit(
     else:
         res: str = remove_punctuation(resp['choices'][0]['message']['content'].strip())
         return res
+
 
 def remove_punctuation(text):
     import string

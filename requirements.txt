@@ -1,12 +1,13 @@
-aiohttp
 aiofiles
-Pillow==10.4.0
+aiohttp
+Pillow>=10.4.0
 civitai-py
 civitai
 colorama
 fastapi
 fal-client
 httpx
+httpx[http2]
 piexif
 pydantic
 PyYAML

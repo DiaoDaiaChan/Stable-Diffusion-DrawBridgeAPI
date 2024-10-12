@@ -1,27 +1,85 @@
 import random
+import uuid
 
 import aiofiles
-import base64
+import aiohttp
 import json
 import asyncio
 import traceback
 import time
 import httpx
 
-from PIL import Image
 from tqdm import tqdm
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from fastapi.exceptions import HTTPException
-from io import BytesIO
 from pathlib import Path
 from datetime import datetime
+from typing import Union
 
 from ..base_config import setup_logger
 from ..base_config import init_instance
-from ..utils import http_request, exceptions
+from ..utils import exceptions
+
+import base64
+from io import BytesIO
+from PIL import Image, ImageDraw, ImageFont
+
 
 class Backend:
+
+    queues = {}
+    locks = {}
+    task_count = 0
+    queue_logger = setup_logger('[QueueManager]')
+
+    @classmethod
+    def get_queue(cls, token):
+        if token not in cls.queues:
+            cls.queues[token] = asyncio.Queue()
+        return cls.queues[token]
+
+    @classmethod
+    def get_lock(cls, token):
+        if token not in cls.locks:
+            cls.locks[token] = asyncio.Lock()
+        return cls.locks[token]
+
+    @classmethod
+    async def add_to_queue(cls, token, request_func, *args, **kwargs):
+        queue = cls.get_queue(token)
+        future = asyncio.get_event_loop().create_future()
+
+        await queue.put((request_func, args, kwargs, future))
+
+        lock = cls.get_lock(token)
+
+        if not lock.locked():
+            asyncio.create_task(cls.process_queue(token))
+
+        return await future
+
+    @classmethod
+    async def process_queue(cls, token):
+        queue = cls.get_queue(token)
+        lock = cls.get_lock(token)
+
+        async with lock:
+            while not queue.empty():
+                request_func, args, kwargs, future = await queue.get()
+                try:
+                    result = await request_func(*args, **kwargs)
+                    if not future.done():
+                        future.set_result(result)
+                    cls.queue_logger.info(f"Token: {token}, 任务成功完成")
+                except Exception as e:
+                    if not future.done():
+                        future.set_exception(e)
+                    cls.queue_logger.info(f"Token: {token}, 任务失败: {e}")
+                finally:
+                    queue.task_done()
+
+                cls.queue_logger.info(f"Token: {token}, 队列中的剩余任务")
+            cls.queue_logger.info(f"Token: {token}, 队列中已无任务")
 
     def __init__(
         self,
@@ -40,13 +98,14 @@ class Backend:
         self.tags: str = payload.get('prompt', '1girl')
         self.ntags: str = payload.get('negative_prompt', '')
         self.seed: int = payload.get('seed', random.randint(0, 4294967295))
+        self.seed_list: list[int] = [self.seed]
         self.steps: int = payload.get('steps', 20)
         self.scale: float = payload.get('cfg_scale', 7.0)
         self.width: int = payload.get('width', 512)
         self.height: int = payload.get('height', 512)
-        self.sampler: str = payload.get('sampler_name', "euler")
+        self.sampler: str = payload.get('sampler_name', "Euler")
         self.restore_faces: bool = payload.get('restore_faces', False)
-        self.scheduler: str = payload.get('scheduler', 'normal')
+        self.scheduler: str = payload.get('scheduler', 'Normal')
 
         self.batch_size: int = payload.get('batch_size', 1)
         self.batch_count: int = payload.get('n_iter', 1)
@@ -54,12 +113,18 @@ class Backend:
 
         self.enable_hr: bool = payload.get('enable_hr', False)
         self.hr_scale: float = payload.get('hr_scale', 1.5)
-        self.hr_second_pass_steps: int = payload.get('hr_second_pass_steps', 7)
+        self.hr_second_pass_steps: int = payload.get('hr_second_pass_steps', self.steps)
+        self.hr_upscaler: str = payload.get('hr_upscaler', "")
         self.denoising_strength: float = payload.get('denoising_strength', 0.6)
+        self.hr_resize_x: int = payload.get('hr_resize_x', 0)
+        self.hr_resize_y: int = payload.get('hr_resize_y', 0)
+        self.hr_sampiler: str = payload.get('hr_sampler_name', "Euler")
+        self.hr_scheduler: str = payload.get('hr_scheduler', 'Normal')
+        self.hr_prompt: str = payload.get('hr_prompt', '')
+        self.hr_negative_prompt: str = payload.get('hr_negative_prompt', '')
+        self.hr_distilled_cfg: float = payload.get('hr_distilled_cfg', 3.5)
 
-        self.init_images: list = payload.get('init_images', None)
-        if self.init_images is not None and len(self.init_images) == 0:
-            self.init_images = None
+        self.init_images: list = payload.get('init_images', [])
 
         self.xl = False
         self.flux = False
@@ -71,6 +136,7 @@ class Backend:
         self.model_hash = "c7352c5d2f"
         self.model_list: list = []
         self.model_path = "models\\1053-S.ckpt"
+        self.client_id = uuid.uuid4().hex
 
         self.comfyui_api_json = comfyui_api_json
 
@@ -109,7 +175,10 @@ class Backend:
         self.parameters = None  # 图片元数据
         self.post_event = None
         self.task_id = None
+        self.task_type = 'txt2img'
         self.workload_name = None
+        self.current_date = datetime.now().strftime('%Y%m%d')
+        self.save_path = ''
 
         self.start_time = None
         self.end_time = None
@@ -120,7 +189,10 @@ class Backend:
         self.build_info: dict = None
         self.build_respond: dict = None
 
+        self.nsfw_detected = False
         self.DBAPIExceptions = exceptions.DrawBridgeAPIException
+
+        self.reflex_dict = {}
 
     def format_api_respond(self):
 
@@ -131,10 +203,10 @@ class Backend:
             "negative_prompt": self.ntags,
             "all_negative_prompts": self.repeat(self.ntags)
         ,
-            "seed": self.seed,
-            "all_seeds": self.repeat(self.seed),
+            "seed": self.seed_list,
+            "all_seeds": self.seed_list,
             "subseed": self.seed,
-            "all_subseeds": self.repeat(self.seed),
+            "all_subseeds": self.seed_list,
             "subseed_strength": 0,
             "width": self.width,
             "height": self.height,
@@ -156,7 +228,7 @@ class Backend:
             },
             "index_of_first_image": 0,
             "infotexts": self.repeat(
-                f"{self.tags}\\nNegative prompt: {self.ntags}\\nSteps: {self.steps}, Sampler: {self.sampler}, CFG scale: {self.scale}, Seed: {self.seed}, Size: {self.final_width}x{self.final_height}, Model hash: c7352c5d2f, Model: {self.model}, Denoising strength: {self.denoising_strength}, Clip skip: {self.clip_skip}, Version: 1.1.4"
+                f"{self.tags}\\nNegative prompt: {self.ntags}\\nSteps: {self.steps}, Sampler: {self.sampler}, CFG scale: {self.scale}, Seed: {self.seed_list}, Size: {self.final_width}x{self.final_height}, Model hash: c7352c5d2f, Model: {self.model}, Denoising strength: {self.denoising_strength}, Clip skip: {self.clip_skip}, Version: 1.1.4"
             )
         ,
             "styles": [
@@ -167,12 +239,13 @@ class Backend:
             "is_using_inpainting_conditioning": False
         }
 
+        self.logger.info(f"{len(self.img)}张图片")
         self.build_respond = {
             "images": self.img,
             "parameters": {
                 "prompt": self.tags,
                 "negative_prompt": self.ntags,
-                "seed": self.seed,
+                "seed": self.seed_list,
                 "subseed": -1,
                 "subseed_strength": 0,
                 "seed_resize_from_h": -1,
@@ -246,7 +319,7 @@ class Backend:
         return models_resp_list
 
     @staticmethod
-    async def save_image(img_data, save_path):
+    async def write_image(img_data, save_path):
         """
         异步保存图片数据到指定路径。
         :param img_data: 图片的字节数据
@@ -577,10 +650,40 @@ class Backend:
             content=None,
             format=True,
             timeout=300,
-            verify=True
-    ) -> json or httpx.Response:
+            verify=True,
+            http2=False,
+            use_aiohttp=False,
+            proxy=False
+    ) -> Union[dict, httpx.Response, bytes]:
 
-        async with httpx.AsyncClient(verify=verify) as client:
+        logger = setup_logger("[HTTP_REQUEST]")
+
+        if use_aiohttp:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
+                async with session.request(
+                        method,
+                        target_url,
+                        headers=headers,
+                        params=params,
+                        data=content,
+                        ssl=verify,
+                        proxy=init_instance.config.server_settings['proxy'] if proxy else None
+                ) as response:
+                    if format:
+                        return await response.json()
+                    else:
+                        return await response.read()
+
+        proxies = {
+            "http://": init_instance.config.server_settings['proxy'] if proxy else None,
+            "https://": init_instance.config.server_settings['proxy'] if proxy else None,
+        }
+
+        async with httpx.AsyncClient(
+                verify=verify,
+                http2=http2,
+                proxies=proxies
+        ) as client:
             try:
                 response = await client.request(
                     method,
@@ -588,14 +691,17 @@ class Backend:
                     headers=headers,
                     params=params,
                     content=content,
-                    timeout=timeout
+                    timeout=timeout,
                 )
                 response.raise_for_status()
             except httpx.RequestError as e:
-
-                return {"error": "Request error", "details": traceback.format_exc()}
+                error_info = {"error": "Request error", "details": traceback.format_exc()}
+                logger.warning(error_info)
+                return error_info
             except httpx.HTTPStatusError as e:
-                return {"error": "HTTP error", "status_code": e.response.status_code, "details": traceback.format_exc()}
+                error_info = {"error": "HTTP error", "status_code": e.response.status_code, "details": traceback.format_exc()}
+                logger.warning(error_info)
+                return error_info
             if format:
                 return response.json()
             else:
@@ -638,7 +744,7 @@ class Backend:
                     params = self.request.query_params
                     content = await self.request.body()
 
-                    response = await http_request(method, target_url, headers, params, content, False)
+                    response = await self.http_request(method, target_url, headers, params, content, False)
 
                     try:
                         resp = response.json()
@@ -648,8 +754,23 @@ class Backend:
 
                     self.result = JSONResponse(content=resp, status_code=response.status_code)
                 else:
-                    await self.posting()
-                    if self.config['server_settings']['enable_nsfw_check']:
+
+                    if "comfyui" in self.backend_name:
+                        await self.add_to_queue((self.token or self.backend_url)[:24], self.posting)
+                        self.logger.info("Comfyui后端, 不使用内置多图生成管理")
+                    elif "a1111" in self.backend_name:
+                        await self.add_to_queue((self.token or self.backend_url)[:24], self.posting)
+                        self.logger.info("A1111后端, 不使用内置多图生成管理")
+                    else:
+                        self.logger.info(f"{self.backend_name}: {self.token[:24]}总共{self.total_img_count}张图")
+                        for i in range(self.total_img_count):
+                            if i > 0:
+                                self.seed += 1
+                                self.seed_list.append(self.seed)
+
+                            await self.add_to_queue((self.token or self.backend_url)[:24], self.posting)
+
+                    if self.config.server_settings['enable_nsfw_check']:
                         await self.pic_audit()
                 break
 
@@ -674,7 +795,7 @@ class Backend:
     async def post_request(self):
         try:
             post_api = f"{self.backend_url}/sdapi/v1/txt2img"
-            if self.input_img:
+            if self.init_images:
                 post_api = f"{self.backend_url}/sdapi/v1/img2img"
 
             response = await self.http_request(
@@ -725,36 +846,36 @@ class Backend:
         """
         使用aiohttp下载图片并保存到指定路径。
         """
-        # 获取当前日期，格式为 '年月日'
-        current_date = datetime.now().strftime('%Y%m%d')
-
-        # 设置保存路径
-        save_path = Path(f'saved_images/txt2img/{current_date}/{self.workload_name[:12]}')
-        save_path.mkdir(parents=True, exist_ok=True)  # 自动创建目录
 
         for url in self.img_url:
             response = await self.http_request(
                 method="GET",
                 target_url=url,
                 headers=None,
-                format=False
+                format=False,
+                verify=False,
             )
 
             if isinstance(response, httpx.Response):
                 if response.status_code == 200:
                     img_data = response.read()
                     self.logger.info("图片下载成功")
-
-                    img_filename = save_path / Path(url).name
-                    await self.run_later(self.save_image(img_data, img_filename), 1)
-
                     self.img.append(base64.b64encode(img_data).decode('utf-8'))
                     self.img_btyes.append(img_data)
+                    await self.save_image(url, img_data)
                 else:
                     self.logger.error(f"图片下载失败！状态码: {response.status_code}")
                     raise ConnectionError("图片下载失败")
             else:
                 self.logger.error(f"请求失败，错误信息: {response.get('details')}")
+
+    async def save_image(self, url, img_data, base_path="txt2img"):
+
+        self.save_path = Path(f'saved_images/{self.task_type}/{self.current_date}/{self.workload_name[:12]}')
+        self.save_path.mkdir(parents=True, exist_ok=True)
+
+        img_filename = self.save_path / Path(url).name
+        await self.run_later(self.write_image(img_data, img_filename), 1)
 
     async def unload_and_reload(self, backend_url=None):
         """
@@ -896,7 +1017,7 @@ class Backend:
 
             self.backend_url = self.config.a1111webui_setting['backend_url'][self.count]
             try:
-                respond = await http_request(
+                respond = await self.http_request(
                     "GET",
                     f"{self.backend_url}/sdapi/v1/sd-models",
                 )
@@ -911,31 +1032,42 @@ class Backend:
             return backend_to_models_dict
 
     async def pic_audit(self):
-        from PIL import Image, ImageDraw, ImageFont
-        import base64
-        from io import BytesIO
         from ..utils.tagger import wd_tagger_handler
         new_image_list = []
         for i in self.result['images']:
             is_nsfw = await wd_tagger_handler.tagger_main(i, 0.35, [], True)
 
             if is_nsfw:
-                img = Image.new('RGB', (512, 512), color=(0, 0, 0))
-                draw = ImageDraw.Draw(img)
-                self.logger.info("检测到违规内容")
-                text = "检测到违规内容"
-                font = ImageFont.load_default()
-                text_width, text_height = draw.textsize(text, font=font)
-                position = ((512 - text_width) // 2, (512 - text_height) // 2)
-                draw.text(position, text, fill=(255, 255, 255), font=font)
-
-                buffered = BytesIO()
-                img.save(buffered, format="PNG")
-
-                img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+                img_base64 = await self.return_nsfw_image()
                 new_image_list.append(img_base64)
             else:
                 new_image_list.append(i)
 
         self.result['images'] = new_image_list
+
+    async def return_nsfw_image(self):
+        img = Image.new("RGB", (512, 512), color=(255, 255, 255))
+        draw = ImageDraw.Draw(img)
+        font = ImageFont.load_default()
+        text = "NSFW Detected"
+
+        text_bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = text_bbox[2] - text_bbox[0]
+        text_height = text_bbox[3] - text_bbox[1]
+
+        text_x = (img.width - text_width) // 2
+        text_y = (img.height - text_height) // 2
+
+        draw.text((text_x, text_y), text, fill=(255, 0, 0), font=font)
+
+        img_byte_array = BytesIO()
+        img.save(img_byte_array, format='PNG')
+        img_byte_array.seek(0)
+
+        base64_image = base64.b64encode(img_byte_array.getvalue()).decode('utf-8')
+        self.img_btyes.append(img_byte_array.getvalue())
+        self.img.append(base64_image)
+
+        return base64_image
+
 

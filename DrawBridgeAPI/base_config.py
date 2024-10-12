@@ -148,6 +148,7 @@ class Config(BaseSettings):
     seaart_setting: dict = empty_dict
     yunjie_setting: dict = empty_dict
     comfyui_setting: dict = empty_dict
+    novelai_setting: dict = empty_dict
 
     civitai: list or None = []
     a1111webui: list = []
@@ -158,6 +159,7 @@ class Config(BaseSettings):
     seaart: list = []
     yunjie: list = []
     comfyui: list = []
+    novelai: list = []
 
     civitai_name: dict = {}
     a1111webui_name: dict = {}
@@ -168,9 +170,11 @@ class Config(BaseSettings):
     seaart_name: dict = {}
     yunjie_name: dict = {}
     comfyui_name: dict = {}
+    novelai_name: dict = {}
 
     server_settings: dict = {}
     retry_times: int = 3
+    proxy: str = ''
 
     workload_dict: dict = {}
 
@@ -239,6 +243,7 @@ _____                              ____           _       _                     
         config.seaart = config.seaart_setting['token']
         config.yunjie = config.yunjie_setting['token']
         config.comfyui = config.comfyui_setting
+        config.novelai = config.novelai_setting['token']
 
         sources_list = [
             (config.civitai, 0, config.civitai_name),
@@ -250,6 +255,7 @@ _____                              ____           _       _                     
             (config.seaart, 6, config.seaart_name),
             (config.yunjie, 7, config.yunjie_name),
             (config.comfyui, 8, config.comfyui_name),
+            (config.novelai, 9, config.novelai_name),
         ]
 
         def process_items(config, items, backend_index, name_dict):
@@ -291,7 +297,7 @@ _____                              ____           _       _                     
             host=config.server_settings['redis_server'][0],
             port=config.server_settings['redis_server'][1],
             password=config.server_settings['redis_server'][2],
-            db=1
+            db=config.server_settings['redis_server'][3]
         )
 
         self.logger.info('redis连接成功')

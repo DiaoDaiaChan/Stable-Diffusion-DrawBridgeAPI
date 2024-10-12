@@ -152,7 +152,7 @@ class Api:
         return result
 
     @staticmethod
-    async def img2img_api(request: request_model.Txt2ImgRequest, api: Request):
+    async def img2img_api(request: request_model.Img2ImgRequest, api: Request):
         data = request.model_dump()
         client_host = api.client.host
 
@@ -230,14 +230,14 @@ class Api:
 
         resp['llm'] = caption
         llm_logger.info(f"打标成功,{caption}")
-        caption = await wd_tagger_handler.tagger_main(
-            base64_image,
-            data['threshold'],
-            data['exclude_tags']
-        )
-
-        resp['caption'] = caption
-        wd_logger.info(f"打标成功,{caption}")
+        # caption = await wd_tagger_handler.tagger_main(
+        #     base64_image,
+        #     data['threshold'],
+        #     data['exclude_tags']
+        # )
+        #
+        # resp['caption'] = caption
+        # wd_logger.info(f"打标成功,{caption}")
         return JSONResponse(resp)
 
     async def get_progress(self):
@@ -315,7 +315,7 @@ class Api:
         if data['image'].startswith("http"):
             image_url = data['image']
             logger.info(f"检测到url: {image_url}")
-            response: httpx.Response = await self.backend_instance.http_request(
+            response = await self.backend_instance.http_request(
                 "GET",
                 image_url,
                 format=False
@@ -374,4 +374,4 @@ if __name__ == "__main__":
         demo = create_gradio_interface(host, port)
         app = gradio.mount_gradio_app(api_instance.app, demo, path="/")
 
-    uvicorn.run(api_instance.app, host=host, port=port, log_level="critical")
+    uvicorn.run(api_instance.app, host=host, port=port)

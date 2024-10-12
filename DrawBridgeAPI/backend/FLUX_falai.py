@@ -115,6 +115,3 @@ class AIDRAW(Backend):
             self.logger.error(f"请求API失败: {e}\n{traceback.format_exc()}")
 
         await self.formating_to_sd_style()
-
-
-

@@ -8,6 +8,7 @@ import random
 class RequetModelClass(BaseModel):
     pass
 
+
 class Txt2ImgRequest(RequetModelClass):
     prompt: Optional[str] = ""
     negative_prompt: Optional[str] = ""
@@ -17,10 +18,10 @@ class Txt2ImgRequest(RequetModelClass):
     subseed_strength: float = 0
     seed_resize_from_h: int = -1
     seed_resize_from_w: int = -1
-    sampler_name: str = "euler"
+    sampler_name: str = "Euler a"
     batch_size: int = 1
     n_iter: int = 1
-    steps: int = 50
+    steps: int = 20
     cfg_scale: float = 7
     width: int = 512
     height: int = 512
@@ -29,7 +30,7 @@ class Txt2ImgRequest(RequetModelClass):
     do_not_save_samples: bool = False
     do_not_save_grid: bool = False
     eta: float = 0
-    denoising_strength: float = 0
+    denoising_strength: float = 1
     s_min_uncond: float = 0
     s_churn: float = 0
     s_tmax: float = 0
@@ -46,14 +47,14 @@ class Txt2ImgRequest(RequetModelClass):
     firstphase_height: int = 0
     hr_scale: float = 2
     hr_upscaler: str = ""
-    hr_second_pass_steps: int = 0
+    hr_second_pass_steps: int = 10
     hr_resize_x: int = 0
     hr_resize_y: int = 0
     hr_checkpoint_name: str = ""
     hr_sampler_name: str = ""
     hr_prompt: str = ""
     hr_negative_prompt: str = ""
-    sampler_index: str = "euler"
+    sampler_index: str = "Euler a"
     script_name: str = ""
     script_args: List[Any] = []
     send_images: bool = True
@@ -70,7 +71,7 @@ class Img2ImgRequest(RequetModelClass):
     subseed_strength: float = 0
     seed_resize_from_h: int = -1
     seed_resize_from_w: int = -1
-    sampler_name: str = "euler"
+    sampler_name: str = "Euler a"
     batch_size: int = 1
     n_iter: int = 1
     steps: int = 50
@@ -107,7 +108,7 @@ class Img2ImgRequest(RequetModelClass):
     inpainting_mask_invert: int = 0
     initial_noise_multiplier: float = 0
     latent_mask: str = ""
-    sampler_index: str = "euler"
+    sampler_index: str = "Euler a"
     include_init_images: bool = False
     script_name: str = ""
     script_args: List[Any] = []

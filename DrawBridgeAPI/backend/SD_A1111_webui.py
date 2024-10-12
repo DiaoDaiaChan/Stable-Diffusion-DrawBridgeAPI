@@ -58,8 +58,13 @@ class AIDRAW(Backend):
         """
         respond = await self.http_request(
             "GET",
-            f"{self.backend_url}/sdapi/v1/options"
+            f"{self.backend_url}/sdapi/v1/options",
+            verify=False,
+            proxy=False,
+            use_aiohttp=False
         )
+
+        print(respond)
 
         self.model = respond['sd_model_checkpoint']
         self.model_hash = respond
