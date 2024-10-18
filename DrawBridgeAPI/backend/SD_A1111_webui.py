@@ -56,6 +56,7 @@ class AIDRAW(Backend):
         获取后端工作进度, 默认A1111
         :return:
         """
+        self.get_backend_id()
         respond = await self.http_request(
             "GET",
             f"{self.backend_url}/sdapi/v1/options",

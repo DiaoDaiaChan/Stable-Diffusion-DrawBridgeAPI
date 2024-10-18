@@ -140,6 +140,8 @@ class AIDRAW(Backend):
 
     async def get_backend_working_progress(self):
 
+        self.get_backend_id()
+
         try:
             response = await self.http_request(
                 method="GET",
@@ -166,7 +168,7 @@ class AIDRAW(Backend):
     async def check_backend_usability(self):
         pass
 
-    async def formating_to_sd_style(self):
+    async def err_formating_to_sd_style(self):
 
         await self.download_img()
         self.format_api_respond()
@@ -198,9 +200,10 @@ class AIDRAW(Backend):
             self.logger.error(respone)
             raise RuntimeError(respone["status_code"])
 
-        await self.heart_beat(respone['prompt_id'])
+        self.task_id = respone['prompt_id']
 
-        await self.formating_to_sd_style()
+        await self.heart_beat(self.task_id)
+        await self.err_formating_to_sd_style()
 
     def update_api_json(self, init_images):
         api_json = copy.deepcopy(self.comfyui_api_json)

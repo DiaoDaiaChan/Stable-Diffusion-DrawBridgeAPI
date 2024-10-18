@@ -19,6 +19,7 @@ from typing import Union
 from ..base_config import setup_logger
 from ..base_config import init_instance
 from ..utils import exceptions
+from ..locales import _
 
 import base64
 from io import BytesIO
@@ -65,27 +66,28 @@ class Backend:
 
         async with lock:
             while not queue.empty():
+
                 request_func, args, kwargs, future = await queue.get()
                 try:
                     result = await request_func(*args, **kwargs)
                     if not future.done():
                         future.set_result(result)
-                    cls.queue_logger.info(f"Token: {token}, 任务成功完成")
+                    cls.queue_logger.info(f"Token: {token}, {_('Task completed successfully')}")
                 except Exception as e:
                     if not future.done():
                         future.set_exception(e)
-                    cls.queue_logger.info(f"Token: {token}, 任务失败: {e}")
+                    cls.queue_logger.info(f"Token: {token}, {_('Task failed')}: {e}")
                 finally:
                     queue.task_done()
 
-                cls.queue_logger.info(f"Token: {token}, 队列中的剩余任务")
-            cls.queue_logger.info(f"Token: {token}, 队列中已无任务")
+                cls.queue_logger.info(f"Token: {token}, {_('Remaining tasks in the queue')}")
+            cls.queue_logger.info(f"Token: {token}, {_('No remaining tasks in the queue')}")
 
     def __init__(
         self,
         login: bool = False,
         backend_url: str = None,
-        token: str = None,
+        token: str = "",
         count: int = None,
         payload: dict = {},
         input_img: str = None,
@@ -144,6 +146,7 @@ class Backend:
         self.time = time.strftime("%Y-%m-%d %H:%M:%S")
 
         self.backend_url = backend_url  # 后端url
+        self.backend_id = None  # 用于区别后端, token或者ulr
         self.headers = {
             "Content-Type": "application/json",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0",
@@ -174,7 +177,7 @@ class Backend:
 
         self.parameters = None  # 图片元数据
         self.post_event = None
-        self.task_id = None
+        self.task_id = uuid.uuid4().hex
         self.task_type = 'txt2img'
         self.workload_name = None
         self.current_date = datetime.now().strftime('%Y%m%d')
@@ -182,6 +185,7 @@ class Backend:
 
         self.start_time = None
         self.end_time = None
+        self.spend_time = None
         self.comment = None
 
         self.current_process = None
@@ -239,7 +243,6 @@ class Backend:
             "is_using_inpainting_conditioning": False
         }
 
-        self.logger.info(f"{len(self.img)}张图片")
         self.build_respond = {
             "images": self.img,
             "parameters": {
@@ -401,247 +404,6 @@ class Backend:
         return build_resp
 
     @staticmethod
-    def format_options_api_resp():
-        build_resp = {
-            "samples_save": True,
-            "samples_format": "png",
-            "samples_filename_pattern": "",
-            "save_images_add_number": True,
-            "grid_save": True,
-            "grid_format": "png",
-            "grid_extended_filename": False,
-            "grid_only_if_multiple": True,
-            "grid_prevent_empty_spots": False,
-            "grid_zip_filename_pattern": "",
-            "n_rows": -1.0,
-            "font": "",
-            "grid_text_active_color": "#000000",
-            "grid_text_inactive_color": "#999999",
-            "grid_background_color": "#ffffff",
-            "enable_pnginfo": True,
-            "save_txt": False,
-            "save_images_before_face_restoration": False,
-            "save_images_before_highres_fix": False,
-            "save_images_before_color_correction": False,
-            "save_mask": False,
-            "save_mask_composite": False,
-            "jpeg_quality": 80.0,
-            "webp_lossless": False,
-            "export_for_4chan": True,
-            "img_downscale_threshold": 4.0,
-            "target_side_length": 4000.0,
-            "img_max_size_mp": 200.0,
-            "use_original_name_batch": True,
-            "use_upscaler_name_as_suffix": False,
-            "save_selected_only": True,
-            "save_init_img": False,
-            "temp_dir": "",
-            "clean_temp_dir_at_start": False,
-            "save_incomplete_images": False,
-            "outdir_samples": "",
-            "outdir_txt2img_samples": "outputs/txt2img-images",
-            "outdir_img2img_samples": "outputs/img2img-images",
-            "outdir_extras_samples": "outputs/extras-images",
-            "outdir_grids": "",
-            "outdir_txt2img_grids": "outputs/txt2img-grids",
-            "outdir_img2img_grids": "outputs/img2img-grids",
-            "outdir_save": "log/images",
-            "outdir_init_images": "outputs/init-images",
-            "save_to_dirs": True,
-            "grid_save_to_dirs": True,
-            "use_save_to_dirs_for_ui": False,
-            "directories_filename_pattern": "[date]",
-            "directories_max_prompt_words": 8.0,
-            "ESRGAN_tile": 192.0,
-            "ESRGAN_tile_overlap": 8.0,
-            "realesrgan_enabled_models": [
-                "R-ESRGAN 4x+",
-                "R-ESRGAN 4x+ Anime6B"
-            ],
-            "upscaler_for_img2img": None,
-            "face_restoration": False,
-            "face_restoration_model": "CodeFormer",
-            "code_former_weight": 0.5,
-            "face_restoration_unload": False,
-            "auto_launch_browser": "Local",
-            "show_warnings": False,
-            "show_gradio_deprecation_warnings": True,
-            "memmon_poll_rate": 8.0,
-            "samples_log_stdout": False,
-            "multiple_tqdm": True,
-            "print_hypernet_extra": False,
-            "list_hidden_files": True,
-            "disable_mmap_load_safetensors": False,
-            "hide_ldm_prints": True,
-            "api_enable_requests": True,
-            "api_forbid_local_requests": True,
-            "api_useragent": "",
-            "unload_models_when_training": False,
-            "pin_memory": False,
-            "save_optimizer_state": False,
-            "save_training_settings_to_txt": True,
-            "dataset_filename_word_regex": "",
-            "dataset_filename_join_string": " ",
-            "training_image_repeats_per_epoch": 1.0,
-            "training_write_csv_every": 500.0,
-            "training_xattention_optimizations": False,
-            "training_enable_tensorboard": False,
-            "training_tensorboard_save_images": False,
-            "training_tensorboard_flush_every": 120.0,
-            "sd_model_checkpoint": "DiaoDaia_mix_4.5.ckpt",
-            "sd_checkpoints_limit": 1.0,
-            "sd_checkpoints_keep_in_cpu": True,
-            "sd_checkpoint_cache": 3,
-            "sd_unet": "None",
-            "enable_quantization": False,
-            "enable_emphasis": True,
-            "enable_batch_seeds": True,
-            "comma_padding_backtrack": 20.0,
-            "CLIP_stop_at_last_layers": 3.0,
-            "upcast_attn": False,
-            "randn_source": "GPU",
-            "tiling": False,
-            "hires_fix_refiner_pass": "second pass",
-            "sdxl_crop_top": 0.0,
-            "sdxl_crop_left": 0.0,
-            "sdxl_refiner_low_aesthetic_score": 2.5,
-            "sdxl_refiner_high_aesthetic_score": 6.0,
-            "sd_vae_explanation": "<abbr title='Variational autoencoder'>VAE</abbr> is a neural network that transforms a standard <abbr title='red/green/blue'>RGB</abbr>\nimage into latent space representation and back. Latent space representation is what stable diffusion is working on during sampling\n(i.e. when the progress bar is between empty and full). For txt2img, VAE is used to create a resulting image after the sampling is finished.\nFor img2img, VAE is used to process user's input image before the sampling, and to create an image after sampling.",
-            "sd_vae_checkpoint_cache": 0,
-            "sd_vae": "None",
-            "sd_vae_overrides_per_model_preferences": False,
-            "auto_vae_precision": True,
-            "sd_vae_encode_method": "Full",
-            "sd_vae_decode_method": "Full",
-            "inpainting_mask_weight": 1.0,
-            "initial_noise_multiplier": 1.0,
-            "img2img_extra_noise": 0,
-            "img2img_color_correction": False,
-            "img2img_fix_steps": False,
-            "img2img_background_color": "#ffffff",
-            "img2img_editor_height": 720.0,
-            "img2img_sketch_default_brush_color": "#ffffff",
-            "img2img_inpaint_mask_brush_color": "#ffffff",
-            "img2img_inpaint_sketch_default_brush_color": "#ffffff",
-            "return_mask": False,
-            "return_mask_composite": False,
-            "cross_attention_optimization": "Automatic",
-            "s_min_uncond": 0.0,
-            "token_merging_ratio": 0.0,
-            "token_merging_ratio_img2img": 0.0,
-            "token_merging_ratio_hr": 0.0,
-            "pad_cond_uncond": False,
-            "persistent_cond_cache": True,
-            "batch_cond_uncond": True,
-            "use_old_emphasis_implementation": False,
-            "use_old_karras_scheduler_sigmas": False,
-            "no_dpmpp_sde_batch_determinism": False,
-            "use_old_hires_fix_width_height": False,
-            "dont_fix_second_order_samplers_schedule": False,
-            "hires_fix_use_firstpass_conds": False,
-            "use_old_scheduling": False,
-            "interrogate_keep_models_in_memory": False,
-            "interrogate_return_ranks": False,
-            "interrogate_clip_num_beams": 1.0,
-            "interrogate_clip_min_length": 24.0,
-            "interrogate_clip_max_length": 48.0,
-            "interrogate_clip_dict_limit": 1500.0,
-            "interrogate_clip_skip_categories": [],
-            "interrogate_deepbooru_score_threshold": 0.5,
-            "deepbooru_sort_alpha": True,
-            "deepbooru_use_spaces": True,
-            "deepbooru_escape": True,
-            "deepbooru_filter_tags": "",
-            "extra_networks_show_hidden_directories": True,
-            "extra_networks_hidden_models": "When searched",
-            "extra_networks_default_multiplier": 1.0,
-            "extra_networks_card_width": 0,
-            "extra_networks_card_height": 0,
-            "extra_networks_card_text_scale": 1.0,
-            "extra_networks_card_show_desc": True,
-            "extra_networks_add_text_separator": " ",
-            "ui_extra_networks_tab_reorder": "",
-            "textual_inversion_print_at_load": False,
-            "textual_inversion_add_hashes_to_infotext": True,
-            "sd_hypernetwork": "None",
-            "localization": "None",
-            "gradio_theme": "Default",
-            "gradio_themes_cache": True,
-            "gallery_height": "",
-            "return_grid": True,
-            "do_not_show_images": False,
-            "send_seed": True,
-            "send_size": True,
-            "js_modal_lightbox": True,
-            "js_modal_lightbox_initially_zoomed": True,
-            "js_modal_lightbox_gamepad": False,
-            "js_modal_lightbox_gamepad_repeat": 250.0,
-            "show_progress_in_title": True,
-            "samplers_in_dropdown": True,
-            "dimensions_and_batch_together": True,
-            "keyedit_precision_attention": 0.1,
-            "keyedit_precision_extra": 0.05,
-            "keyedit_delimiters": ".,\\/!?%^*;:{}=`~()",
-            "keyedit_move": True,
-            "quicksettings_list": [
-                "sd_model_checkpoint",
-                "sd_unet",
-                "sd_vae",
-                "CLIP_stop_at_last_layers"
-            ],
-            "ui_tab_order": [],
-            "hidden_tabs": [],
-            "ui_reorder_list": [],
-            "hires_fix_show_sampler": False,
-            "hires_fix_show_prompts": False,
-            "disable_token_counters": False,
-            "add_model_hash_to_info": True,
-            "add_model_name_to_info": True,
-            "add_user_name_to_info": False,
-            "add_version_to_infotext": True,
-            "disable_weights_auto_swap": True,
-            "infotext_styles": "Apply if any",
-            "show_progressbar": True,
-            "live_previews_enable": True,
-            "live_previews_image_format": "png",
-            "show_progress_grid": True,
-            "show_progress_every_n_steps": 10.0,
-            "show_progress_type": "Approx NN",
-            "live_preview_allow_lowvram_full": False,
-            "live_preview_content": "Prompt",
-            "live_preview_refresh_period": 1000.0,
-            "live_preview_fast_interrupt": False,
-            "hide_samplers": [],
-            "eta_ddim": 0.0,
-            "eta_ancestral": 1.0,
-            "ddim_discretize": "uniform",
-            "s_churn": 0.0,
-            "s_tmin": 0.0,
-            "s_tmax": 0,
-            "s_noise": 1.0,
-            "k_sched_type": "Automatic",
-            "sigma_min": 0.0,
-            "sigma_max": 0.0,
-            "rho": 0.0,
-            "eta_noise_seed_delta": 0,
-            "always_discard_next_to_last_sigma": False,
-            "sgm_noise_multiplier": False,
-            "uni_pc_variant": "bh1",
-            "uni_pc_skip_type": "time_uniform",
-            "uni_pc_order": 3.0,
-            "uni_pc_lower_order_final": True,
-            "postprocessing_enable_in_main_ui": [],
-            "postprocessing_operation_order": [],
-            "upscaling_max_images_in_cache": 5.0,
-            "disabled_extensions": [],
-            "disable_all_extensions": "none",
-            "restore_config_state_file": "",
-            "sd_checkpoint_hash": "91e0f7cbaf70676153810c231e8703bf26b3208c116a3d1f2481cbc666905471"
-        }
-
-        return build_resp
-
-    @staticmethod
     async def http_request(
             method,
             target_url,
@@ -719,25 +481,68 @@ class Backend:
         pass
 
     async def get_backend_working_progress(self):
-        pass
 
-    async def send_result_to_api(self) -> JSONResponse:
+        self.get_backend_id()
+
+        avg_time = 0
+        try:
+            if self.redis_client.exists("backend_avg_time"):
+                backend_avg_dict = json.loads(self.redis_client.get("backend_avg_time"))
+                spend_time_list = backend_avg_dict.get(self.backend_id, [])
+                if spend_time_list and len(spend_time_list) >= 10:
+                    sorted_list = sorted(spend_time_list)
+                    trimmed_list = sorted_list[1:-1]
+                    avg_time = sum(trimmed_list) / len(trimmed_list) if trimmed_list else None
+
+            workload_dict = await self.set_backend_working_status(get=True)
+            start_time = workload_dict.get('start_time', None)
+            end_time = workload_dict.get('end_time', None)
+            current_time = time.time()
+
+            if end_time:
+                progress = 0.0
+            else:
+                if start_time:
+                    spend_time = current_time - start_time
+                    self.logger.info(f"当前耗时: {spend_time}")
+
+                    if avg_time:
+                        progress = 0.99 if spend_time > avg_time else spend_time / avg_time
+                    else:
+                        progress = 0.99
+                else:
+                    progress = 0.0
+
+            available = await self.set_backend_working_status(get=True, key="available")
+            sc = 200 if available is True else 500
+            build_resp = self.format_progress_api_resp(progress, self.start_time)
+
+        except:
+            traceback.print_exc()
+
+        return build_resp, sc, self.backend_id, sc
+
+    async def send_result_to_api(self):
         """
         获取生图结果的函数
         :return: 类A1111 webui返回值
         """
+        if self.backend_id is None:
+            self.get_backend_id()
         total_retry = self.config.retry_times
 
         for retry_times in range(total_retry):
             self.start_time = time.time()
-            await self.set_backend_working_status(self.start_time, True)
+
             try:
-                await self.set_backend_working_status(idle=False)
+                await self.set_backend_working_status(
+                    params={"start_time": self.start_time, "idle": False, "end_time": None}
+                )
                 # 如果传入了Request对象/转发请求
                 if self.request:
                     target_url = f"{self.backend_url}/{self.path}"
 
-                    self.logger.info(f"已转发请求 - {target_url}")
+                    self.logger.info(f"{_('Forwarding request')} - {target_url}")
 
                     method = self.request.method
                     headers = self.request.headers
@@ -750,25 +555,25 @@ class Backend:
                         resp = response.json()
                     except json.JSONDecodeError:
                         self.logger.error(str(response.text))
-                        raise RuntimeError('后端返回错误')
+                        raise RuntimeError(_('Backend returned error'))
 
                     self.result = JSONResponse(content=resp, status_code=response.status_code)
                 else:
 
                     if "comfyui" in self.backend_name:
-                        await self.add_to_queue((self.token or self.backend_url)[:24], self.posting)
-                        self.logger.info("Comfyui后端, 不使用内置多图生成管理")
+                        await self.add_to_queue(self.backend_id[:24], self.posting)
+                        self.logger.info(_('Comfyui Backend, not using built-in multi-image generation management'))
                     elif "a1111" in self.backend_name:
-                        await self.add_to_queue((self.token or self.backend_url)[:24], self.posting)
-                        self.logger.info("A1111后端, 不使用内置多图生成管理")
+                        await self.add_to_queue(self.backend_id[:24], self.posting)
+                        self.logger.info(_('A1111 Backend, not using built-in multi-image generation management'))
                     else:
-                        self.logger.info(f"{self.backend_name}: {self.token[:24]}总共{self.total_img_count}张图")
+                        self.logger.info(f"{self.backend_name}: {self.backend_id[:24]} total {self.total_img_count} images")
                         for i in range(self.total_img_count):
                             if i > 0:
                                 self.seed += 1
                                 self.seed_list.append(self.seed)
 
-                            await self.add_to_queue((self.token or self.backend_url)[:24], self.posting)
+                            await self.add_to_queue(self.backend_id[:24], self.posting)
 
                     if self.config.server_settings['enable_nsfw_check']:
                         await self.pic_audit()
@@ -776,21 +581,27 @@ class Backend:
 
             except Exception as e:
 
-                self.logger.info(f"第{retry_times + 1}次尝试")
+                self.logger.info(f"{retry_times + 1} retries")
                 self.logger.error(traceback.format_exc())
 
-                if retry_times >= (total_retry - 1):
-                    await asyncio.sleep(30)
+                # if retry_times >= (total_retry - 1):
+                #     await asyncio.sleep(30)
 
-                if retry_times > total_retry:
-                    raise RuntimeError(f"重试{total_retry}次后仍然发生错误, 请检查服务器")
+                if retry_times == (total_retry - 1):
+
+                    err = traceback.format_exc()
+                    self.logger.error(f"{_('Over maximum retry times, posting still failed')}: {err}")
+                    await self.return_build_image(text=f"Exception: {e}", title="FATAL")
+                    await self.err_formating_to_sd_style()
+                    return self
 
             finally:
                 self.end_time = time.time()
-                self.logger.info(f"请求完成，共耗时{self.end_time - self.start_time}")
-                await self.set_backend_working_status(idle=True)
+                self.spend_time = self.end_time - self.start_time
+                self.logger.info(_("Request completed, took %s seconds") % int(self.spend_time))
+                await self.set_backend_working_status(params={"end_time": self.end_time, "idle": True})
 
-        return self.result
+        return self
 
     async def post_request(self):
         try:
@@ -813,13 +624,13 @@ class Backend:
                 if response.status_code not in [200, 201]:
                     self.logger.error(resp_dict)
                     if resp_dict.get("error") == "OutOfMemoryError":
-                        self.logger.info("检测到爆显存，执行自动模型释放并加载")
+                        self.logger.info(_("VRAM OOM detected, auto model unload and reload"))
                         await self.unload_and_reload(self.backend_url)
                 else:
                     self.result = resp_dict
-                    self.logger.info("获取到返回图片，正在处理")
+                    self.logger.info(_("Get a respond image, processing"))
             else:
-                self.logger.error(f"请求失败，错误信息: {response.get('details')}")
+                self.logger.error(f"{_('Request failed, error message:')} {response.get('details')}")
             return True
 
         except:
@@ -854,27 +665,28 @@ class Backend:
                 headers=None,
                 format=False,
                 verify=False,
+                proxy=True
             )
 
             if isinstance(response, httpx.Response):
                 if response.status_code == 200:
                     img_data = response.read()
-                    self.logger.info("图片下载成功")
+                    self.logger.info(_("Downloading image successful"))
                     self.img.append(base64.b64encode(img_data).decode('utf-8'))
                     self.img_btyes.append(img_data)
-                    await self.save_image(url, img_data)
+                    await self.save_image(img_data)
                 else:
-                    self.logger.error(f"图片下载失败！状态码: {response.status_code}")
-                    raise ConnectionError("图片下载失败")
+                    self.logger.error(f"{_('Image download failed!')}: {response.status_code}")
+                    raise ConnectionError(_('Image download failed!'))
             else:
-                self.logger.error(f"请求失败，错误信息: {response.get('details')}")
+                self.logger.error(f"{_('Request failed, error message:')} {response.get('details')}")
 
-    async def save_image(self, url, img_data, base_path="txt2img"):
+    async def save_image(self, img_data, base_path="txt2img"):
 
         self.save_path = Path(f'saved_images/{self.task_type}/{self.current_date}/{self.workload_name[:12]}')
         self.save_path.mkdir(parents=True, exist_ok=True)
 
-        img_filename = self.save_path / Path(url).name
+        img_filename = self.save_path / Path(self.task_id).name
         await self.run_later(self.write_image(img_data, img_filename), 1)
 
     async def unload_and_reload(self, backend_url=None):
@@ -895,7 +707,7 @@ class Backend:
                 error_message = await response.text()
                 self.logger.error(f"释放模型失败，可能是webui版本太旧，未支持此API，错误: {error_message}")
         else:
-            self.logger.error(f"请求失败，错误信息: {response.get('details')}")
+            self.logger.error(f"{_('Request failed, error message:')} {response.get('details')}")
 
         # 重载模型
         response = await self.http_request(
@@ -911,7 +723,7 @@ class Backend:
             else:
                 self.logger.info("重载模型成功")
         else:
-            self.logger.error(f"请求失败，错误信息: {response.get('details')}")
+            self.logger.error(f"{_('Request failed, error message:')} {response.get('details')}")
 
     async def get_backend_status(self):
         """
@@ -966,41 +778,36 @@ class Backend:
 
     async def set_backend_working_status(
             self,
-            start_time=None,
-            idle=None,
-            available=None,
-            get=False,
-            key=None,
+            params: dict = None,
+            get: bool = False,
+            key: str = None,
     ) -> bool or None:
         """
-        :param start_time : 任务开始时间
-        :param idle : 后端是否待机
-        :param available: 后端是否可以使用
+        设置或获取后端工作状态
+
+        :param params: 包含要更新的参数的字典 (如 {'start_time': xxx, 'idle': True})
         :param get: 是否只读取
         :param key: 要获取的键
-        :return:
+        :return: 获取或设置结果
         """
-        current_backend_workload: bytes = self.redis_client.get('workload')
+        current_backend_workload = self.redis_client.get('workload')
         backend_workload: dict = json.loads(current_backend_workload.decode('utf-8'))
-        current_backend_workload = backend_workload.get(self.workload_name)
+        current_backend_workload: dict = backend_workload.get(self.workload_name)
 
         if get:
             if key is None:
                 return current_backend_workload
-            return current_backend_workload[key]
+            return current_backend_workload.get(key, None)
 
-        if start_time:
-            current_backend_workload['start_time'] = start_time
-
-        if idle is not None:
-            current_backend_workload['idle'] = idle
-
-        if available is not None:
-            current_backend_workload['available'] = available
+        if params:
+            for param_key, param_value in params.items():
+                if param_key in current_backend_workload:
+                    current_backend_workload[param_key] = param_value
 
         backend_workload[self.workload_name] = current_backend_workload
+        self.redis_client.set('workload', json.dumps(backend_workload))
 
-        self.redis_client.set(f"workload", json.dumps(backend_workload))
+        return True
 
     async def get_models(self) -> dict:
 
@@ -1038,36 +845,99 @@ class Backend:
             is_nsfw = await wd_tagger_handler.tagger_main(i, 0.35, [], True)
 
             if is_nsfw:
-                img_base64 = await self.return_nsfw_image()
+                img_base64 = await self.return_build_image()
                 new_image_list.append(img_base64)
             else:
                 new_image_list.append(i)
 
         self.result['images'] = new_image_list
 
-    async def return_nsfw_image(self):
+    async def return_build_image(self, title='Warning', text='NSFW Detected'):
+
+        def draw_rounded_rectangle(draw, xy, radius, fill):
+            x0, y0, x1, y1 = xy
+            draw.rectangle([x0 + radius, y0, x1 - radius, y1], fill=fill)  # 中间部分
+            draw.rectangle([x0, y0 + radius, x0 + radius, y1 - radius], fill=fill)  # 左上角
+            draw.rectangle([x1 - radius, y0 + radius, x1, y1 - radius], fill=fill)  # 右上角
+            draw.pieslice([x0, y0, x0 + 2 * radius, y0 + 2 * radius], 180, 270, fill=fill)  # 左上圆角
+            draw.pieslice([x1 - 2 * radius, y0, x1, y0 + 2 * radius], 270, 360, fill=fill)  # 右上圆角
+            draw.pieslice([x0, y1 - 2 * radius, x0 + 2 * radius, y1], 90, 180, fill=fill)  # 左下圆角
+            draw.pieslice([x1 - 2 * radius, y1 - 2 * radius, x1, y1], 0, 90, fill=fill)  # 右下圆角
+
+        # 创建一个新的图像
         img = Image.new("RGB", (512, 512), color=(255, 255, 255))
         draw = ImageDraw.Draw(img)
-        font = ImageFont.load_default()
-        text = "NSFW Detected"
 
-        text_bbox = draw.textbbox((0, 0), text, font=font)
-        text_width = text_bbox[2] - text_bbox[0]
-        text_height = text_bbox[3] - text_bbox[1]
+        # 设置字体大小
+        title_font_size = 24
+        text_font_size = 16
 
-        text_x = (img.width - text_width) // 2
-        text_y = (img.height - text_height) // 2
+        # 加载默认字体
+        title_font = ImageFont.load_default()
+        text_font = ImageFont.load_default()
 
-        draw.text((text_x, text_y), text, fill=(255, 0, 0), font=font)
+        # 绘制标题背景
+        title_x = 20  # 左对齐，设置标题的横坐标
+        title_y = 20  # 设置标题的纵坐标
+        title_bbox = draw.textbbox((0, 0), title, font=title_font)
 
+        # 绘制以标题为边界的背景
+        draw_rounded_rectangle(draw,
+                               (title_x - 10, title_y - 10, title_x + title_bbox[2] + 10, title_y + title_bbox[3] + 10),
+                               radius=10, fill=(0, 0, 0))
+
+        # 绘制标题
+        draw.text((title_x, title_y), title, fill=(255, 255, 255), font=title_font)  # 白色标题
+
+        # 准备绘制文本，设置最大宽度
+        max_text_width = img.width - 40
+        wrapped_text = []
+        words = text.split(' ')
+        current_line = ""
+
+        for word in words:
+            test_line = f"{current_line} {word}".strip()
+            text_bbox = draw.textbbox((0, 0), test_line, font=text_font)
+            if text_bbox[2] - text_bbox[0] <= max_text_width:
+                current_line = test_line
+            else:
+                wrapped_text.append(current_line)
+                current_line = word
+
+        wrapped_text.append(current_line)  # 添加最后一行
+
+        # 绘制内容文字
+        text_y = title_y + 40  # 让内容文字与标题有间距
+        for line in wrapped_text:
+            text_x = 20  # 左对齐，设置内容文字的横坐标
+
+            # 绘制内容文字背景
+            text_bbox = draw.textbbox((0, 0), line, font=text_font)
+            draw_rounded_rectangle(draw,
+                                   (text_x - 10, text_y - 5, text_x + text_bbox[2] + 10, text_y + text_bbox[3] + 5),
+                                   radius=10, fill=(0, 0, 0))
+
+            # 绘制内容文字
+            draw.text((text_x, text_y), line, fill=(255, 255, 255), font=text_font)  # 白色内容文字
+            text_y += text_bbox[3] - text_bbox[1] + 5  # 行间距
+
+        # 将图像保存到内存字节流中
         img_byte_array = BytesIO()
         img.save(img_byte_array, format='PNG')
         img_byte_array.seek(0)
 
+        # 编码为base64
         base64_image = base64.b64encode(img_byte_array.getvalue()).decode('utf-8')
         self.img_btyes.append(img_byte_array.getvalue())
         self.img.append(base64_image)
 
         return base64_image
 
+    def get_backend_id(self):
+        self.backend_id = self.token or self.backend_url
 
+    async def err_formating_to_sd_style(self):
+
+        self.format_api_respond()
+
+        self.result = self.build_respond

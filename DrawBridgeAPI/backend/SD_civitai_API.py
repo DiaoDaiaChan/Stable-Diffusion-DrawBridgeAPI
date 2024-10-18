@@ -26,29 +26,6 @@ class AIDRAW(Backend):
         # 覆写函数
         pass
 
-    async def get_backend_working_progress(self):
-        try:
-            self.logger = self.setup_logger('[Civitai]')
-
-            token = self.config.civitai[self.count]
-            self.token = token
-            self.backend_name = self.config.backend_name_list[0]
-            self.workload_name = f"{self.backend_name}-{token}"
-
-            resp = await self.set_backend_working_status(get=True)
-
-            progress = resp['idle']
-            available = resp['available']
-            progress = 0.99 if progress is False else 0.0
-
-            build_resp = self.format_progress_api_resp(progress, self.start_time)
-
-            sc = 200 if available is True else 500
-        except:
-            traceback.print_exc()
-
-        return build_resp, sc, self.token, sc
-
     async def get_img_comment(self):
 
         image_data = self.img_btyes[0]
@@ -80,7 +57,7 @@ class AIDRAW(Backend):
             resp_json = response
             return True, (resp_json, 200)
 
-    async def formating_to_sd_style(self):
+    async def err_formating_to_sd_style(self):
 
         await self.download_img()
         self.format_api_respond()
@@ -124,7 +101,7 @@ class AIDRAW(Backend):
                 self.fail_on_requesting = True
                 self.logger.error(f"请求API失败: {e}\n{traceback.format_exc()}")
 
-        await self.formating_to_sd_style()
+        await self.err_formating_to_sd_style()
 
 
 

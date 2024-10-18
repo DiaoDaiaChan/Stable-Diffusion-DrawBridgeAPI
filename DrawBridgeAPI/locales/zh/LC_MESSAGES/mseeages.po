@@ -1,0 +1,168 @@
+msgid "Loading config file completed"
+msgstr "加载配置文件完成"
+
+msgid "Redis connection successful"
+msgstr "Redis连接成功"
+
+msgid "Exec TXT2IMG"
+msgstr "开始进行文生图"
+
+msgid "IMG2IMG Requires image to start"
+msgstr "图生图需要图片来启动"
+
+msgid "Exec IMG2IMG"
+msgstr "开始进行图生图"
+
+msgid "Caption Successful"
+msgstr "打标成功"
+
+msgid "Lock to backend has configured"
+msgstr "设置已经锁定后端"
+
+msgid "URL detected"
+msgstr "检测到url"
+
+msgid "Image download failed!"
+msgstr "图片下载失败!"
+
+msgid "Exec forwarding"
+msgstr "开始进行转发"
+
+msgid "Waiting for API initialization"
+msgstr "请等待API初始化"
+
+msgid "Loading LLM"
+msgstr "LLM加载中"
+
+msgid "LLM loading completed, waiting for command"
+msgstr "LLM加载完成,等待命令"
+
+msgid "Loading Checkpoint"
+msgstr "模型加载中"
+
+msgid "Checkpoint loading completed, waiting for command"
+msgstr "模型加载完成,等待命令"
+
+msgid "Server is ready!"
+msgstr "服务器准备就绪!"
+
+msgid "Manually select model"
+msgstr ""手动选择模型"
+
+msgid "Backend select"
+msgstr "已选择后端"
+
+msgid "Backend locked"
+msgstr "已锁定后端"
+
+msgid "Starting backend selection"
+msgstr "开始进行后端选择"
+
+msgid "Backend %s is down"
+msgstr "后端%s掉线"
+
+msgid "Backend %s is failed or locked"
+msgstr "后端%s出错或者锁定中"
+
+msgid "No available backend"
+msgstr "没有可用后端"
+
+msgid "Backend: %s Average work time: %s seconds, Current tasks: %s"
+msgstr "后端: %s 平均工作时间: %s秒, 现在进行中的任务: %s"
+
+msgid "Extra time weight"
+msgstr "额外的时间权重"
+
+msgid "Backend %s is the fastest, has been selected"
+msgstr "后端%s最快, 已经选择"
+
+msgid "Task completed successfully"
+msgstr "任务成功完成"
+
+msgid "Task failed"
+msgstr "任务失败"
+
+msgid "Remaining tasks in the queue"
+msgstr "队列中的剩余任务"
+
+msgid "No remaining tasks in the queue"
+msgstr "队列中已无任务"
+
+msgid "Forwarding request"
+msgstr "已转发请求"
+
+msgid "Backend returned error"
+msgstr "后端返回错误"
+
+msgid "Comfyui Backend, not using built-in multi-image generation management"
+msgstr "Comfyui后端, 不使用内置多图生成管理"
+
+msgid "A1111 Backend, not using built-in multi-image generation management"
+msgstr "A1111后端, 不使用内置多图生成管理"
+
+msgid "Over maximum retry times, posting still failed"
+msgstr "超过最大重试次数之后依然失败"
+
+msgid "Request completed, took %s seconds"
+msgstr "请求完成，共耗%s秒"
+
+msgid "VRAM OOM detected, auto model unload and reload"
+msgstr "检测到爆显存，执行自动模型释放并加载"
+
+msgid "Get a respond image, processing"
+msgstr "获取到返回图片，正在处理"
+
+msgid "Request failed, error message:"
+msgstr "请求失败，错误信息:"
+
+msgid "Downloading image successful"
+msgstr "图片下载成功"
+
+msgid ""
+msgstr ""
+
+msgid ""
+msgstr ""
+
+msgid ""
+msgstr ""
+
+msgid ""
+msgstr ""
+
+msgid ""
+msgstr ""
+
+msgid ""
+msgstr ""
+
+msgid ""
+msgstr ""
+
+msgid ""
+msgstr ""
+
+msgid ""
+msgstr ""
+
+msgid ""
+msgstr ""
+
+msgid ""
+msgstr ""
+
+msgid ""
+msgstr ""
+
+msgid ""
+msgstr ""
+
+msgid ""
+msgstr ""
+
+msgid ""
+msgstr ""
+
+msgid ""
+msgstr ""
+

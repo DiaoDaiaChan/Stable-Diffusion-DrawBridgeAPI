@@ -13,6 +13,7 @@ import numpy as np
 from io import BytesIO
 
 from ..base_config import init_instance , setup_logger
+from ..locales import _
 
 llm_logger = setup_logger('[LLM-Caption]')
 
@@ -200,12 +201,12 @@ class JoyCaptionHandler:
         self.pipeline, self.joy_caption = self._initialize()
 
     def _initialize(self):
-        llm_logger.info("LLM加载中")
+        llm_logger.info(_("Loading LLM"))
         joy_caption_load = Joy_caption_load()
         model_path = self.config.server_settings['llm_caption']['llm']
         pipeline, = joy_caption_load.gen(model_path)
         joy_caption = Joy_caption()
-        llm_logger.info("LLM加载完成,等待命令")
+        llm_logger.info(_("LLM loading completed, waiting for command"))
         return pipeline, joy_caption
 
     async def get_caption(self, image, ntags=[]):

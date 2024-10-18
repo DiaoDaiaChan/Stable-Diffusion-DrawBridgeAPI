@@ -8,6 +8,7 @@ import base64
 import httpx
 from ..base_config import init_instance
 from ..backend import TaskHandler
+from ..locales import _
 
 
 class Gradio:
@@ -35,7 +36,7 @@ def create_gradio_interface(host, port):
     gradio_api = Gradio(host, port)
     from ..api_server import api_instance
     all_models = [i['title'] for i in asyncio.run(api_instance.get_sd_models())]
-    init_instance.logger.info(f"服务器准备就绪! Listen on {host}:{port}")
+    init_instance.logger.info(f"{_('Server is ready!')} Listen on {host}:{port}")
 
     def get_image(model, prompt, negative_prompt, width, height, cfg_scale, steps):
 

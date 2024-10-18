@@ -35,6 +35,8 @@ checkpoint by/模型 https://huggingface.co/nyanko7/flux-dev-anime-cg
 - https://www.seaart.ai/
 - https://www.yunjie.art/
 - https://github.com/comfyanonymous/ComfyUI
+- https://novelai.net/image
+- https://github.com/novicezk/midjourney-proxy
 
 ### Deployment Guide (For Windows CMD)
 ### You need to deploy a Redis server on the server! Please install it yourself.

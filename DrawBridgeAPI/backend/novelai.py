@@ -60,30 +60,13 @@ class AIDRAW(Backend):
 
         return closest_resolution
 
-    async def get_backend_working_progress(self):
-        try:
-
-            resp = await self.set_backend_working_status(get=True)
-            progress = resp['idle']
-            available = resp['available']
-
-            progress = 0.99 if progress is False else 0.0
-
-            build_resp = self.format_progress_api_resp(progress, self.start_time)
-
-            sc = 200 if available is True else 500
-        except:
-            traceback.print_exc()
-
-        return build_resp, sc, self.token, sc
-
     async def check_backend_usability(self):
         pass
 
-    async def formating_to_sd_style(self):
+    async def err_formating_to_sd_style(self):
 
         if self.nsfw_detected:
-            await self.return_nsfw_image()
+            await self.return_build_image()
 
         self.format_api_respond()
 
@@ -146,8 +129,15 @@ class AIDRAW(Backend):
                             await asyncio.sleep(wait_time)
                         else:
                             response_data = await response.read()
-                            with zipfile.ZipFile(io.BytesIO(response_data)) as z:
-                                z.extractall(self.save_path)
+                            try:
+                                with zipfile.ZipFile(io.BytesIO(response_data)) as z:
+                                    z.extractall(self.save_path)
+                            except:
+                                try:
+                                    resp_text = await response.json()
+                                except:
+                                    if resp_text['statusCode'] == 402:
+                                        self.logger.warning(f"token余额不足, {resp_text}")
                             return
 
         await send_request()
@@ -157,7 +147,7 @@ class AIDRAW(Backend):
 
         await self.images_to_base64(self.save_path)
 
-        await self.formating_to_sd_style()
+        await self.err_formating_to_sd_style()
 
     async def images_to_base64(self, save_path):
 

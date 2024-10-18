@@ -13,6 +13,7 @@ from pathlib import Path
 from huggingface_hub import hf_hub_download
 
 from ..base_config import setup_logger, init_instance
+from ..locales import _
 
 
 use_cpu = True
@@ -209,9 +210,9 @@ class WaifuDiffusionTaggerHandler:
             model_path=self.model_path,
             tags_path=self.tags_path
         )
-        wd_logger.info("模型加载中")
+        wd_logger.info(_("Loading Checkpoint"))
         wd_instance.load()
-        wd_logger.info("模型加载完成")
+        wd_logger.info(_("Checkpoint loading completed, waiting for command"))
         return wd_instance
 
     async def tagger_main(self, base64_img, threshold, ntags=[], audit=False, ratings=False):

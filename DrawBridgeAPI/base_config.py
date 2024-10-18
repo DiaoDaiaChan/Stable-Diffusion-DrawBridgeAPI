@@ -21,9 +21,7 @@ else:
         traceback.print_exc()
         import subprocess
         subprocess.run([sys.executable, "-m", "pip", "install", "pydantic_settings"])
-        print("请重启 / please restart")
-
-        sys.exit()
+        from pydantic_settings import BaseSettings
 
 from pathlib import Path
 
@@ -149,6 +147,7 @@ class Config(BaseSettings):
     yunjie_setting: dict = empty_dict
     comfyui_setting: dict = empty_dict
     novelai_setting: dict = empty_dict
+    midjourney_setting: dict = empty_dict
 
     civitai: list or None = []
     a1111webui: list = []
@@ -160,6 +159,7 @@ class Config(BaseSettings):
     yunjie: list = []
     comfyui: list = []
     novelai: list = []
+    midjourney: list = []
 
     civitai_name: dict = {}
     a1111webui_name: dict = {}
@@ -171,6 +171,7 @@ class Config(BaseSettings):
     yunjie_name: dict = {}
     comfyui_name: dict = {}
     novelai_name: dict = {}
+    midjourney_name: dict = {}
 
     server_settings: dict = {}
     retry_times: int = 3
@@ -180,6 +181,7 @@ class Config(BaseSettings):
 
     base_workload_dict: dict = {
         "start_time": None,
+        "end_time": None,
         "idle": True,
         "available": True,
         "fault": False
@@ -209,7 +211,7 @@ class ConfigInit:
         with open(self.config_file_path, "r", encoding="utf-8") as f:
             yaml_config = yaml_.load(f, Loader=yaml_.FullLoader)
             config = Config(**yaml_config)
-            self.logger.info('加载配置文件完成')
+            self.logger.info('Loading config file completed')
 
             return config
 
@@ -229,7 +231,7 @@ _____                              ____           _       _                     
                                                                 __/ |                                     
                                                                 |___/
 关注雕雕, 关注雕雕喵
-项目地址: https://github.com/DiaoDaiaChan/Stable-Diffusion-DrawBridgeAPI                                                                                                      
+项目地址/Project Re: https://github.com/DiaoDaiaChan/Stable-Diffusion-DrawBridgeAPI                                                                                                      
         '''
 
         print(welcome_txt)
@@ -244,6 +246,7 @@ _____                              ____           _       _                     
         config.yunjie = config.yunjie_setting['token']
         config.comfyui = config.comfyui_setting
         config.novelai = config.novelai_setting['token']
+        config.midjourney = config.midjourney_setting
 
         sources_list = [
             (config.civitai, 0, config.civitai_name),
@@ -256,6 +259,7 @@ _____                              ____           _       _                     
             (config.yunjie, 7, config.yunjie_name),
             (config.comfyui, 8, config.comfyui_name),
             (config.novelai, 9, config.novelai_name),
+            (config.midjourney, 10, config.midjourney_name),
         ]
 
         def process_items(config, items, backend_index, name_dict):
@@ -269,6 +273,11 @@ _____                              ____           _       _                     
                     key = f"{config.backend_name_list[backend_index]}-{items['name'][i]}"
                     config.workload_dict[key] = config.base_workload_dict
                     name_dict[f"comfyui-{items['name'][i]}"] = items['backend_url'][i]
+            elif backend_index == 10:
+                for i in range(len(items['name'])):
+                    key = f"{config.backend_name_list[backend_index]}-{items['name'][i]}"
+                    config.workload_dict[key] = config.base_workload_dict
+                    name_dict[f"midjourney-{items['name'][i]}"] = items['backend_url'][i]
             else:
                 for n in items:
                     key = f"{config.backend_name_list[backend_index]}-{n}"
@@ -300,7 +309,7 @@ _____                              ____           _       _                     
             db=config.server_settings['redis_server'][3]
         )
 
-        self.logger.info('redis连接成功')
+        self.logger.info('Redis connection successful')
 
         workload_json = json.dumps(config.workload_dict)
 

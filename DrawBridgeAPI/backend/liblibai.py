@@ -49,7 +49,7 @@ class AIDRAW(Backend):
                 await asyncio.sleep(5)
                 continue
             else:
-                await self.set_backend_working_status(available=True)
+                # await self.set_backend_working_status(available=True)
                 for i in images:
                     if 'porn' in i['previewPath']:
                         self.nsfw_detected = True
@@ -64,30 +64,13 @@ class AIDRAW(Backend):
         # 覆写函数
         pass
 
-    async def get_backend_working_progress(self):
-        try:
-
-            resp = await self.set_backend_working_status(get=True)
-            progress = resp['idle']
-            available = resp['available']
-
-            progress = 0.99 if progress is False else 0.0
-
-            build_resp = self.format_progress_api_resp(progress, self.start_time)
-
-            sc = 200 if available is True else 500
-        except:
-            traceback.print_exc()
-
-        return build_resp, sc, self.token, sc
-
     async def check_backend_usability(self):
         pass
 
-    async def formating_to_sd_style(self):
+    async def err_formating_to_sd_style(self):
 
         if self.nsfw_detected:
-            await self.return_nsfw_image()
+            await self.return_build_image()
         else:
             await self.download_img()
 
@@ -198,8 +181,6 @@ class AIDRAW(Backend):
         }
         self.headers.update(new_headers)
 
-        await self.set_backend_working_status(available=False)
-
         response = await self.http_request(
             method="POST",
             target_url="https://liblib-api.vibrou.com/gateway/sd-api/generate/image",
@@ -219,6 +200,6 @@ class AIDRAW(Backend):
             task_id = task['data']
             await self.heart_beat(task_id)
 
-        await self.formating_to_sd_style()
+        await self.err_formating_to_sd_style()
 
 

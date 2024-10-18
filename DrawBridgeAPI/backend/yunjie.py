@@ -50,7 +50,6 @@ class AIDRAW(Backend):
                     continue
 
                 for item in items:
-                    await self.set_backend_working_status(available=True)
                     url = item.get("url")
 
                     if url:
@@ -60,32 +59,14 @@ class AIDRAW(Backend):
 
         raise RuntimeError(f"任务 {id_} 在60次心跳后仍未完成")
 
-
     async def update_progress(self):
         # 覆写函数
         pass
 
-    async def get_backend_working_progress(self):
-        try:
-
-            resp = await self.set_backend_working_status(get=True)
-            progress = resp['idle']
-            available = resp['available']
-
-            progress = 0.99 if progress is False else 0.0
-
-            build_resp = self.format_progress_api_resp(progress, self.start_time)
-
-            sc = 200 if available is True else 500
-        except:
-            traceback.print_exc()
-
-        return build_resp, sc, self.token, sc
-
     async def check_backend_usability(self):
         pass
 
-    async def formating_to_sd_style(self):
+    async def err_formating_to_sd_style(self):
 
         await self.download_img()
 
@@ -132,8 +113,6 @@ class AIDRAW(Backend):
             "Token": self.token
         }
         self.headers.update(new_headers)
-
-        await self.set_backend_working_status(available=False)
         data = json.dumps(input_)
 
         # 使用 http_request 函数发送 POST 请求
@@ -150,5 +129,5 @@ class AIDRAW(Backend):
             task = response
             task_id = task['data']['taskId']
             await self.heart_beat(task_id)
-            await self.formating_to_sd_style()
+            await self.err_formating_to_sd_style()
 

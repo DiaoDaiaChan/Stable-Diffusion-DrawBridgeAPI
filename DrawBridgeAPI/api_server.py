@@ -19,7 +19,6 @@ os.environ['CIVITAI_API_TOKEN'] = 'kunkun'
 os.environ['FAL_KEY'] = 'Daisuki'
 path_env = os.getenv("CONF_PATH")
 
-from .backend import TaskHandler, Backend, StaticHandler
 from .utils import request_model, topaz, run_later
 from .ui import create_gradio_interface
 from .base_config import setup_logger, init_instance
@@ -28,6 +27,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.exceptions import HTTPException
 from pathlib import Path
+
+from locales import _
 
 app = FastAPI()
 
@@ -47,6 +48,8 @@ config_file_path = path_env or args.conf
 init_instance.init(config_file_path)
 config = init_instance.config
 redis_client = init_instance.redis_client
+
+from .backend import TaskHandler, Backend, StaticHandler
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -140,7 +143,7 @@ class Api:
 
         task_handler = TaskHandler(data, model_to_backend=model_to_backend)
         try:
-            logger.info(f"开始进行文生图 - {client_host}")
+            logger.info(f"{_('Exec TXT2IMG')} - {client_host}")
             result = await task_handler.txt2img()
         except Exception as e:
             logger.error(traceback.format_exc())
@@ -157,12 +160,12 @@ class Api:
         client_host = api.client.host
 
         if len(data['init_images']) == 0:
-            raise HTTPException(status_code=400, detail='图生图需要图片来启动')
+            raise HTTPException(status_code=400, detail=_('IMG2IMG Requires image to start'))
 
         task_handler = TaskHandler(data)
 
         try:
-            logger.info(f"开始进行图生图 - {client_host}")
+            logger.info(f"{_('Exec IMG2IMG')} - {client_host}")
             result = await task_handler.img2img()
         except Exception as e:
             logger.error(traceback.format_exc())
@@ -209,7 +212,7 @@ class Api:
         resp = {}
 
         resp['caption'] = caption
-        wd_logger.info(f"打标成功,{caption}")
+        wd_logger.info(f"{_('Caption Successful')}, {caption}")
         return JSONResponse(resp)
 
     async def llm_caption(self, request: request_model.TaggerRequest):
@@ -229,7 +232,7 @@ class Api:
         resp = {}
 
         resp['llm'] = caption
-        llm_logger.info(f"打标成功,{caption}")
+        llm_logger.info(f"{_('Caption Successful')}, {caption}")
         # caption = await wd_tagger_handler.tagger_main(
         #     base64_image,
         #     data['threshold'],
@@ -246,15 +249,16 @@ class Api:
     async def get_memory(self):
         return JSONResponse(self.backend_instance.format_vram_api_resp())
 
-    async def get_options(self):
-        return JSONResponse(self.backend_instance.format_options_api_resp())
+    @staticmethod
+    async def get_options():
+        return JSONResponse(StaticHandler.get_backend_options())
 
     @staticmethod
     async def set_options(request: request_model.SetConfigRequest):
 
         data = request.model_dump()
         if data.get('sd_model_checkpoint', None):
-            logger.info("设置已经锁定后端")
+            logger.info(_("Lock to backend has configured"))
             StaticHandler.set_lock_to_backend(data.get('sd_model_checkpoint'))
 
         return
@@ -314,7 +318,7 @@ class Api:
 
         if data['image'].startswith("http"):
             image_url = data['image']
-            logger.info(f"检测到url: {image_url}")
+            logger.info(f"{_('URL detected')}: {image_url}")
             response = await self.backend_instance.http_request(
                 "GET",
                 image_url,
@@ -322,7 +326,7 @@ class Api:
             )
 
             if response.status_code != 200:
-                logger.warning("图片下载失败!")
+                logger.warning(_("Image download failed!"))
 
             base64_image = base64.b64encode(response.read())
 
@@ -344,7 +348,7 @@ async def proxy(path: str, request: Request):
     task_handler = TaskHandler({}, request, path)
 
     try:
-        logger.info(f"开始进行转发 - {client_host}")
+        logger.info(f"{_('Exec forwarding')} - {client_host}")
         result = await task_handler.sd_api()
     except Exception as e:
         logger.error(traceback.format_exc())
@@ -363,9 +367,9 @@ async def get_backend_control(backend: str, key: str, value: bool):
 
 @app.on_event("startup")
 async def startup_event():
-    logger.info('请等待API初始化')
+    logger.info(_('Waiting for API initialization'))
     await api_instance.get_sd_models()
-    logger.info('API初始化成功')
+    logger.info(_('API initialization completed'))
 
 
 if __name__ == "__main__":
@@ -374,4 +378,4 @@ if __name__ == "__main__":
         demo = create_gradio_interface(host, port)
         app = gradio.mount_gradio_app(api_instance.app, demo, path="/")
 
-    uvicorn.run(api_instance.app, host=host, port=port)
+    uvicorn.run(api_instance.app, host=host, port=port, log_level='critical')

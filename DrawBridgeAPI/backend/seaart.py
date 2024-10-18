@@ -49,7 +49,6 @@ class AIDRAW(Backend):
                         continue
 
                     elif isinstance(urls, list):
-                        await self.set_backend_working_status(available=True)
                         for url in urls:
                             self.logger.img(f"图片url: {url['url']}")
                             self.img_url.append(url['url'])
@@ -62,27 +61,10 @@ class AIDRAW(Backend):
         # 覆写函数
         pass
 
-    async def get_backend_working_progress(self):
-        try:
-
-            resp = await self.set_backend_working_status(get=True)
-            progress = resp['idle']
-            available = resp['available']
-
-            progress = 0.99 if progress is False else 0.0
-
-            build_resp = self.format_progress_api_resp(progress, self.start_time)
-
-            sc = 200 if available is True else 500
-        except:
-            traceback.print_exc()
-
-        return build_resp, sc, self.token, sc
-
     async def check_backend_usability(self):
         pass
 
-    async def formating_to_sd_style(self):
+    async def err_formating_to_sd_style(self):
 
         await self.download_img()
 
@@ -136,7 +118,6 @@ class AIDRAW(Backend):
 
         self.headers.update(new_headers)
 
-        await self.set_backend_working_status(available=False)
         data = json.dumps(input_)
         response = await self.http_request(
             method="POST",
@@ -154,5 +135,5 @@ class AIDRAW(Backend):
             if task_id:
                 await self.heart_beat(task_id)
 
-        await self.formating_to_sd_style()
+        await self.err_formating_to_sd_style()
 
