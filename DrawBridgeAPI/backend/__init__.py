@@ -27,8 +27,8 @@ from .comfyui import AIDRAW as AIDRAW9
 from .novelai import AIDRAW as AIDRAW10
 from .midjourney import AIDRAW as AIDRAW11
 from .base import Backend
-from ..locales import _
 
+from DrawBridgeAPI.locales import _ as i18n
 
 class BaseHandler:
 
@@ -297,6 +297,7 @@ class A1111WebuiHandlerAPI(BaseHandler):
 
 class StaticHandler:
     lock_to_backend = None
+    prompt_style: list = None
 
     @classmethod
     def set_lock_to_backend(cls, selected_model: str):
@@ -305,6 +306,14 @@ class StaticHandler:
     @classmethod
     def get_lock_to_backend(cls):
         return cls.lock_to_backend
+    
+    @classmethod
+    def get_prompt_style(cls):
+        return cls.prompt_style
+    
+    @classmethod
+    def set_prompt_style(cls, prompt_style: list):
+        cls.prompt_style = prompt_style
 
     @classmethod
     def get_backend_options(cls):
@@ -717,6 +726,8 @@ class TaskHandler(StaticHandler):
 
     async def choice_backend(self):
 
+        from DrawBridgeAPI.locales import _ as i18n
+
         if self.disable_loadbalance:
             return
         backend_url_dict = self.enable_backend
@@ -749,7 +760,7 @@ class TaskHandler(StaticHandler):
         if self.model_to_backend and key is not None:
 
             backend_index = self.get_backend_index(backend_url_dict, key)
-            logger.info(f"{_('Manually select model')}: {self.model_to_backend}, {_('Backend select')}{key[:24]}")
+            logger.info(f"{i18n('Manually select model')}: {self.model_to_backend}, {i18n('Backend select')}{key[:24]}")
 
             self.ava_backend_url = backend_url_dict[key]
             self.ava_backend_index = backend_index
@@ -759,7 +770,7 @@ class TaskHandler(StaticHandler):
         elif self.lock_to_backend:
             if self.lock_to_backend and key is not None:
                 backend_index = self.get_backend_index(backend_url_dict, key)
-                logger.info(f"{_('Backend locked')}: {key[:24]}")
+                logger.info(f"{i18n('Backend locked')}: {key[:24]}")
 
                 self.ava_backend_url = backend_url_dict[key]
                 self.ava_backend_index = backend_index
@@ -768,11 +779,11 @@ class TaskHandler(StaticHandler):
 
         else:
             all_resp = await asyncio.gather(*tasks, return_exceptions=True)
-            logger.info(_('Starting backend selection'))
+            logger.info(i18n('Starting backend selection'))
             for resp_tuple in all_resp:
                 e += 1
                 if isinstance(resp_tuple, None or Exception):
-                    logger.warning(_('Backend %s is down') % self.instance_list[e].workload_name[:24])
+                    logger.warning(i18n('Backend %s is down') % self.instance_list[e].workload_name[:24])
                 else:
                     try:
                         if resp_tuple[3] in [200, 201]:
@@ -782,7 +793,7 @@ class TaskHandler(StaticHandler):
                         else:
                             raise RuntimeError
                     except RuntimeError or TypeError:
-                        logger.warning(_('Backend %s is failed or locked') % self.instance_list[e].workload_name[:24])
+                        logger.warning(i18n('Backend %s is failed or locked') % self.instance_list[e].workload_name[:24])
                         continue
                     else:
                         # 更改判断逻辑
@@ -806,8 +817,8 @@ class TaskHandler(StaticHandler):
                     ) as pbar:
                         pbar.update(progress)
             if len(normal_backend) == 0:
-                logger.error(_('No available backend'))
-                raise RuntimeError(_('No available backend'))
+                logger.error(i18n('No available backend'))
+                raise RuntimeError(i18n('No available backend'))
 
             backend_total_work_time = {}
             avg_time_dict = await self.get_backend_avg_work_time()
@@ -816,7 +827,7 @@ class TaskHandler(StaticHandler):
             eta = 0
 
             for (site, time_), (_, image_count) in zip(avg_time_dict.items(), backend_image.items()):
-                self.load_balance_logger.info(_('Backend: %s Average work time: %s seconds, Current tasks: %s') % (site, time_, image_count - 1))
+                self.load_balance_logger.info(i18n('Backend: %s Average work time: %s seconds, Current tasks: %s') % (site, time_, image_count - 1))
                 if site in normal_backend:
                     self.update_backend_status()
                     for key in self.backend_status:
@@ -834,7 +845,7 @@ class TaskHandler(StaticHandler):
                     total_work_time = effective_time * int(image_count)
 
                     eta = eta if time_ else 0
-                    self.load_balance_logger.info(f"{_('Extra time weight')}{eta}")
+                    self.load_balance_logger.info(f"{i18n('Extra time weight')}{eta}")
 
                     backend_total_work_time[site] = total_work_time - eta if (total_work_time - eta) >= 0 else total_work_time
 
@@ -849,7 +860,7 @@ class TaskHandler(StaticHandler):
             sorted_list = sorted(total_time_dict)
             fastest_backend = sorted_list[0]
             ava_url = rev_dict[fastest_backend]
-            self.load_balance_logger.info(_('Backend %s is the fastest, has been selected') % ava_url[:24])
+            self.load_balance_logger.info(i18n('Backend %s is the fastest, has been selected') % ava_url[:24])
             ava_url_index = list(backend_url_dict.values()).index(ava_url)
 
             self.ava_backend_url = ava_url

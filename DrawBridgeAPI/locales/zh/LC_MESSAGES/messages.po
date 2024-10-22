@@ -47,7 +47,7 @@ msgid "Server is ready!"
 msgstr "服务器准备就绪!"
 
 msgid "Manually select model"
-msgstr ""手动选择模型"
+msgstr "手动选择模型"
 
 msgid "Backend select"
 msgstr "已选择后端"
@@ -117,52 +117,3 @@ msgstr "请求失败，错误信息:"
 
 msgid "Downloading image successful"
 msgstr "图片下载成功"
-
-msgid ""
-msgstr ""
-
-msgid ""
-msgstr ""
-
-msgid ""
-msgstr ""
-
-msgid ""
-msgstr ""
-
-msgid ""
-msgstr ""
-
-msgid ""
-msgstr ""
-
-msgid ""
-msgstr ""
-
-msgid ""
-msgstr ""
-
-msgid ""
-msgstr ""
-
-msgid ""
-msgstr ""
-
-msgid ""
-msgstr ""
-
-msgid ""
-msgstr ""
-
-msgid ""
-msgstr ""
-
-msgid ""
-msgstr ""
-
-msgid ""
-msgstr ""
-
-msgid ""
-msgstr ""
-

@@ -133,6 +133,7 @@ def setup_logger(custom_prefix="[MAIN]"):
 
 
 class Config(BaseSettings):
+
     backend_name_list: list = []
 
     server_settings: dict = None
@@ -220,6 +221,9 @@ class ConfigInit:
         self.config_file_path = config_file_path
         config = self.load_config()
 
+        config.backend_name_list = ['civitai', 'a1111', 'falai', 'replicate', 'liblibai', 'tusiart', 'seaart', 'yunjie',
+                                    'comfyui', 'novelai', 'midjourney']
+
         welcome_txt = '''
 欢迎使用 
 _____                              ____           _       _                               _____    _____ 
@@ -302,11 +306,16 @@ _____                              ____           _       _                     
         for back_name in list(config.workload_dict.keys()):
             models_dict[back_name] = config.models_list
 
+        try:
+            db_index = config.server_settings['redis_server'][3]
+        except IndexError:
+            db_index = 24
+
         self.redis_client = redis.Redis(
             host=config.server_settings['redis_server'][0],
             port=config.server_settings['redis_server'][1],
             password=config.server_settings['redis_server'][2],
-            db=config.server_settings['redis_server'][3]
+            db=db_index
         )
 
         self.logger.info('Redis connection successful')
@@ -316,6 +325,7 @@ _____                              ____           _       _                     
         rp = self.redis_client.pipeline()
         rp.set('workload', workload_json)
         rp.set('models', json.dumps(models_dict))
+        rp.set('styles', json.dumps([]))
         rp.execute()
 
         self.config = config

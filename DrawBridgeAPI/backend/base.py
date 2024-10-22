@@ -24,6 +24,7 @@ from ..locales import _
 import base64
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
+from ..utils.shared import PATH_TO_COMFYUI_WORKFLOWS
 
 
 class Backend:
@@ -141,6 +142,7 @@ class Backend:
         self.client_id = uuid.uuid4().hex
 
         self.comfyui_api_json = comfyui_api_json
+        self.comfyui_api_json_reflex = None
 
         self.result: list = []
         self.time = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -416,7 +418,7 @@ class Backend:
             http2=False,
             use_aiohttp=False,
             proxy=False
-    ) -> Union[dict, httpx.Response, bytes]:
+    ) -> Union[dict, httpx.Response, bytes, list]:
 
         logger = setup_logger("[HTTP_REQUEST]")
 
@@ -837,6 +839,36 @@ class Backend:
             }
 
             return backend_to_models_dict
+
+    async def get_all_prompt_style(self) -> list:
+
+        if self.backend_name == "comfyui":
+
+            work_flows = []
+            json_files = PATH_TO_COMFYUI_WORKFLOWS.glob("**/*.json")
+
+            for json_file in json_files:
+                prefixed_filename = f"comfyui-work-flows-{json_file.name}"
+                work_flows.append(prefixed_filename)
+            print(work_flows)
+            return work_flows
+
+        else:
+
+            self.backend_url = self.config.a1111webui_setting['backend_url'][self.count]
+            try:
+                respond = await self.http_request(
+                    "GET",
+                    f"{self.backend_url}/sdapi/v1/prompt-styles",
+                    format=True
+                )
+            except Exception:
+                self.logger.warning(f"获取预设失败")
+
+            if respond.get('error', None):
+                return []
+            else:
+                return await respond.json()
 
     async def pic_audit(self):
         from ..utils.tagger import wd_tagger_handler

@@ -68,17 +68,23 @@ class AIDRAW(Backend):
             "Beta": "beta"
         }
 
+        self.reflex_dict['parameters'] = {}
+
         self.scheduler = self.reflex_dict['scheduler'].get(self.scheduler, "normal")
         self.sampler = self.reflex_dict['sampler'].get(self.sampler, "euler")
 
         self.model_path = self.config.comfyui['model'][self.count]
 
         self.logger.info(f"选择工作流{self.comfyui_api_json}")
+        path_to_json = self.comfyui_api_json
         if self.comfyui_api_json:
 
             with open(
                     Path(f"{os.path.dirname(os.path.abspath(__file__))}/../comfyui_workflows/{self.comfyui_api_json}.json").resolve(), 'r') as f:
                 self.comfyui_api_json = json.load(f)
+            with open(
+                    Path(f"{os.path.dirname(os.path.abspath(__file__))}/../comfyui_workflows/{path_to_json}_reflex.json").resolve(), 'r') as f:
+                self.comfyui_api_json_reflex = json.load(f)
 
     async def heart_beat(self, id_):
         self.logger.info(f"{id_} 开始请求")
@@ -91,7 +97,7 @@ class AIDRAW(Backend):
             )
 
             if response:
-                for img in response[id_]['outputs']['9']['images']:
+                for img in response[id_]['outputs'][str(self.comfyui_api_json_reflex.get('output', 9))]['images']:
                     img_url = f"{self.backend_url}/view?filename={img['filename']}"
                     self.img_url.append(img_url)
 
@@ -114,7 +120,7 @@ class AIDRAW(Backend):
                                 progress_bar = await asyncio.to_thread(
                                     tqdm, total=max_value,
                                    desc=f"Prompt ID: {ws_msg['data']['prompt_id']}",
-                                   unit="step"
+                                   unit="steps"
                                 )
 
                             delta = value - progress_bar.n
@@ -207,116 +213,82 @@ class AIDRAW(Backend):
 
     def update_api_json(self, init_images):
         api_json = copy.deepcopy(self.comfyui_api_json)
-
         self.logger.info(api_json)
 
-        # sampler
-        update_dict = api_json.get('3', None)
-        if update_dict:
-            update = {
+        update_mapping = {
+            "sampler": {
                 "seed": self.seed,
                 "steps": self.steps,
                 "cfg": self.scale,
                 "sampler_name": self.sampler,
                 "scheduler": self.scheduler,
                 "denoise": self.denoising_strength
-            }
-            api_json['3']['inputs'].update(update)
-        # update checkpoint
-        update_dict = api_json.get('4', None)
-        if update_dict:
-            update = {
-                "ckpt_name": self.model_path if self.model_path else None
-            }
-            api_json['4']['inputs'].update(update)
-        # image size
-        update_dict = api_json.get('5', None)
-        if update_dict:
-            update = {
+            },
+            "image_size": {
                 "width": self.width,
                 "height": self.height,
-                "batch_size": self.batch_size,
-            }
-            api_json['5']['inputs'].update(update)
-        # prompt
-        update_dict = api_json.get('6', None)
-        if update_dict:
-            update = {
+                "batch_size": self.batch_size
+            },
+            "prompt": {
                 "text": self.tags
-            }
-            api_json['6']['inputs'].update(update)
-        # negative prompt
-        update_dict = api_json.get('7', None)
-        if update_dict:
-            update = {
+            },
+            "negative_prompt": {
                 "text": self.ntags
-            }
-            api_json['7']['inputs'].update(update)
-        # LatentUpscale / load image
-        if self.init_images:
-            update_dict = api_json.get('10', None)
-            if update_dict:
-                update = {
-                    "image": init_images[0]['name']
-                }
-                api_json['10']['inputs'].update(update)
-        else:
-            update_dict = api_json.get('10', None)
-            if update_dict:
-                update = {
+            },
+            "checkpoint": {
+                "ckpt_name": self.model_path if self.model_path else None
+            },
+            "latentupscale": {
                     "width": int(self.width*self.hr_scale) if not self.hr_resize_x else self.hr_resize_x,
                     "height": int(self.height*self.hr_scale) if not self.hr_resize_y else self.hr_resize_y,
-                }
-                api_json['10']['inputs'].update(update)
-        # image upscale
-        # update_dict = api_json.get('12', None)
-        # if update_dict:
-        #     update = {
-        #         "model_name": self.hr_upscaler if self.hr_upscaler else "RealESRGAN_x4plus.pth"
-        #     }
-        #     api_json['12']['inputs'].update(update)
-        # resize image
-        update_dict = api_json.get('14', None)
-        if update_dict:
-            update = {
-                "ckpt_name": self.model_path if self.model_path else None
-            }
-            api_json['14']['inputs'].update(update)
-        update_dict = api_json.get('15', None)
-        if update_dict:
-            update = {
+            },
+            "load_image": {
+                    "image": init_images[0]['name'] if self.init_images else None
+            },
+            "resize": {
                 "width": int(self.width*self.hr_scale) if not self.hr_resize_x else self.hr_resize_x,
                 "height": int(self.height*self.hr_scale) if not self.hr_resize_y else self.hr_resize_y,
-            }
-            api_json['15']['inputs'].update(update)
-        # hr_steps
-        update_dict = api_json.get('19', None)
-        if update_dict:
-            update = {
+            },
+            "hr_steps": {
                 "seed": self.seed,
                 "steps": self.hr_second_pass_steps,
                 "cfg": self.hr_scale,
                 "sampler_name": self.sampler,
                 "scheduler": self.scheduler,
                 "denoise": self.denoising_strength,
-            }
-            api_json['19']['inputs'].update(update)
-
-        if self.hr_prompt:
-            update_dict = api_json.get('21', None)
-            if update_dict:
-                update = {
+            },
+            "hr_prompt": {
                     "text": self.hr_prompt
-                }
-                api_json['21']['inputs'].update(update)
-
-        if self.hr_negative_prompt:
-            update_dict = api_json.get('22', None)
-            if update_dict:
-                update = {
+            },
+            "hr_negative_prompt": {
                     "text": self.hr_negative_prompt
-                }
-                api_json['22']['inputs'].update(update)
+            },
+
+        }
+
+        for item, node_id in self.comfyui_api_json_reflex.items():
+            if node_id:
+                node_id = [str(node_id)] if isinstance(node_id, int) else node_id
+                for id_ in node_id:
+                    update_dict = api_json.get(id_, None)
+                    if update_dict and item in update_mapping:
+                        api_json[id_]['inputs'].update(update_mapping[item])
+
+
+        test_dict = {
+            "sampler": 3,
+            "image_size": 5,
+            "prompt": 6,
+            "negative_prompt": 7,
+            "checkpoint": 4,
+            "latentupscale": 10,
+            "load_image": 0,
+            "resize": 15,
+            "hr_steps": 19,
+            "hr_prompt": 21,
+            "hr_negative_prompt": 22,
+            "output": 9
+        }
 
         self.logger.info(api_json)
         self.comfyui_api_json = api_json

@@ -101,6 +101,11 @@ class Api:
             self.set_options,
             methods=["POST"]
         )
+        self.add_api_route(
+            "/sdapi/v1/prompt-styles",
+            self.get_prompt_styles,
+            methods=["GET"]
+        )
 
         if config.server_settings['build_in_tagger']:
 
@@ -332,13 +337,35 @@ class Api:
 
         return base64_image
 
+    async def get_prompt_styles(self):
+
+        if StaticHandler.prompt_style:
+            return StaticHandler.get_prompt_style()
+        else:
+            task_list = []
+            path = '/sdapi/v1/prompt-styles'
+
+            task_handler = TaskHandler({}, None, path, reutrn_instance=True, override_model_select=True)
+            instance_list: list[Backend] = await task_handler.txt2img()
+
+            for i in instance_list:
+                task_list.append(i.get_all_prompt_style())
+            resp = await asyncio.gather(*task_list)
+
+            api_respond = []
+            for i in resp:
+                api_respond += i
+
+            StaticHandler.set_prompt_style(api_respond)
+
+            return api_respond
+
+    async def init_api(self):
+        await self.get_sd_models()
+        await self.get_prompt_styles()
+
 
 api_instance = Api()
-
-
-@app.post('/sdapi/v1/prompt-styles')
-async def _(request):
-    pass
 
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
@@ -368,7 +395,7 @@ async def get_backend_control(backend: str, key: str, value: bool):
 @app.on_event("startup")
 async def startup_event():
     logger.info(_('Waiting for API initialization'))
-    await api_instance.get_sd_models()
+    await api_instance.init_api()
     logger.info(_('API initialization completed'))
 
 
@@ -378,4 +405,4 @@ if __name__ == "__main__":
         demo = create_gradio_interface(host, port)
         app = gradio.mount_gradio_app(api_instance.app, demo, path="/")
 
-    uvicorn.run(api_instance.app, host=host, port=port, log_level='critical')
+    uvicorn.run(api_instance.app, host=host, port=port)

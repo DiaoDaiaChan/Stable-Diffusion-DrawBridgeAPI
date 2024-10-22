@@ -146,6 +146,7 @@ server_settings:
     - 127.0.0.1  # 地址
     - 6379  # 端口
     - null  # redis 密码
+    - 4 # redis数据库编号
   enable_nsfw_check:
     false  
   save_image:  # 是否直接保存图片
