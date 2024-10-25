@@ -134,6 +134,14 @@ novelai_setting:
   model:
     - nai-diffusion-3
 
+midjourney_setting:
+  backend_url:
+    - http://192.168.5.206:8081
+  name:
+    - default-mj-api
+  auth_toekn:
+    - null
+
 server_settings:
   # 重点! 需要启动的后端, 有些后端你没配置的话依然启动会导致API报错（虽然API会将它锁定，之后请求就不会到它）
   # 怎么数呢？ 比如在这个配置文件中 civitai 的第一个token是 0 a1111 的第一个后端是 1 , 第二个是2
