@@ -18,7 +18,6 @@ class AIDRAW(Backend):
     def __init__(self, count, payload, **kwargs):
         super().__init__(count=count, payload=payload, **kwargs)
         # 需要更改
-        self.model = f"Comfyui - "
         self.model_hash = "c7352c5d2f"
         self.logger = self.setup_logger('[Comfyui]')
         backend = self.config.comfyui['name'][self.count]
@@ -26,6 +25,7 @@ class AIDRAW(Backend):
         self.workload_name = f"{self.backend_name}-{backend}"
 
         self.current_config: dict = self.config.comfyui_setting
+        self.model = f"Comfyui - {self.current_config['model'][self.count]}"
         self.backend_url = self.current_config['backend_url'][self.count]
 
         self.reflex_dict['sampler'] = {
@@ -111,6 +111,8 @@ class AIDRAW(Backend):
                 async for msg in ws:
                     if msg.type == aiohttp.WSMsgType.TEXT:
                         ws_msg = json.loads(msg.data)
+                        #
+                        # current_node = ws_msg['data']['node']
 
                         if ws_msg['type'] == 'progress':
                             value = ws_msg['data']['value']
@@ -131,6 +133,14 @@ class AIDRAW(Backend):
                                 self.logger.info(f"{id_}绘画完成!")
                                 await get_images()
                                 await ws.close()
+                    #
+                    # elif msg.type == aiohttp.WSMsgType.BINARY:
+                    #     if current_node == 'save_image_websocket_node':
+                    #         bytes_msg = msg.data
+                    #         images_output = output_images.get(current_node, [])
+                    #         images_output.append(bytes_msg[8:])
+                    #         output_images[current_node] = images_output
+
 
                     elif msg.type == aiohttp.WSMsgType.ERROR:
                         self.logger.error(f"Error: {msg.data}")
@@ -273,7 +283,6 @@ class AIDRAW(Backend):
                     update_dict = api_json.get(id_, None)
                     if update_dict and item in update_mapping:
                         api_json[id_]['inputs'].update(update_mapping[item])
-
 
         test_dict = {
             "sampler": 3,

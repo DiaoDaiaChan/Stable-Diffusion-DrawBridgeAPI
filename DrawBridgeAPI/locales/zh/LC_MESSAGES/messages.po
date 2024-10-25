@@ -117,3 +117,6 @@ msgstr "请求失败，错误信息:"
 
 msgid "Downloading image successful"
 msgstr "图片下载成功"
+
+msgid "Selected ComfyUI style"
+msgstr "已选择ComfyUI工作流"

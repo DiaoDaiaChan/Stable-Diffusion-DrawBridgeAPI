@@ -98,6 +98,7 @@ class Backend:
         **kwargs,
     ):
 
+
         self.tags: str = payload.get('prompt', '1girl')
         self.ntags: str = payload.get('negative_prompt', '')
         self.seed: int = payload.get('seed', random.randint(0, 4294967295))
@@ -118,7 +119,7 @@ class Backend:
         self.hr_scale: float = payload.get('hr_scale', 1.5)
         self.hr_second_pass_steps: int = payload.get('hr_second_pass_steps', self.steps)
         self.hr_upscaler: str = payload.get('hr_upscaler', "")
-        self.denoising_strength: float = payload.get('denoising_strength', 0.6)
+        self.denoising_strength: float = payload.get('denoising_strength', 1.0)
         self.hr_resize_x: int = payload.get('hr_resize_x', 0)
         self.hr_resize_y: int = payload.get('hr_resize_y', 0)
         self.hr_sampiler: str = payload.get('hr_sampler_name', "Euler")
@@ -247,6 +248,8 @@ class Backend:
 
         self.build_respond = {
             "images": self.img,
+            "videos": [],
+            "images_url": self.img_url,
             "parameters": {
                 "prompt": self.tags,
                 "negative_prompt": self.ntags,
@@ -845,30 +848,35 @@ class Backend:
         if self.backend_name == "comfyui":
 
             work_flows = []
+            resp_dict = {}
             json_files = PATH_TO_COMFYUI_WORKFLOWS.glob("**/*.json")
 
             for json_file in json_files:
                 prefixed_filename = f"comfyui-work-flows-{json_file.name}"
-                work_flows.append(prefixed_filename)
-            print(work_flows)
+                work_flows.append({"name": prefixed_filename, "prompt": "", "negative_prompt": ""})
+
             return work_flows
 
         else:
 
-            self.backend_url = self.config.a1111webui_setting['backend_url'][self.count]
+            resp = []
+
             try:
+                self.backend_url = self.config.a1111webui_setting['backend_url'][self.count]
                 respond = await self.http_request(
                     "GET",
                     f"{self.backend_url}/sdapi/v1/prompt-styles",
                     format=True
                 )
-            except Exception:
-                self.logger.warning(f"获取预设失败")
+                if respond.get('error', None):
+                    self.logger.warning(f"获取预设失败")
+                else:
+                    resp = await respond.json()
 
-            if respond.get('error', None):
-                return []
-            else:
-                return await respond.json()
+            except:
+                self.logger.warning(f"获取预设失败")
+            finally:
+                return resp
 
     async def pic_audit(self):
         from ..utils.tagger import wd_tagger_handler

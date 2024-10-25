@@ -36,7 +36,8 @@ class BaseHandler:
         self,
         payload,
         request: Request = None,
-        path: str = None
+        path: str = None,
+        comfyui_task=None,
     ):
         self.task_list = []
         self.instance_list: list[Backend] = []
@@ -46,7 +47,7 @@ class BaseHandler:
         self.config = init_instance.config
         self.all_task_list = list(range(len(list(self.config.name_url[0].keys()))))
         self.enable_backend: dict = {}
-        self.comfyui_task: str = 'sdbase_txt2img'
+        self.comfyui_task: str = 'sdbase_txt2img' or comfyui_task
 
     async def get_enable_task(
         self,
@@ -646,7 +647,6 @@ class TaskHandler(StaticHandler):
             working_images += num
             cls.backend_images[backend_site] = working_images
 
-        cls.load_balance_logger.error(cls.backend_images)
         if get:
             for site in cls.backend_site_list:
                 all_backend_dict[site] = cls.backend_images.get(site, 1)
@@ -679,6 +679,7 @@ class TaskHandler(StaticHandler):
         self.model_to_backend = model_to_backend  # 模型的名称
         self.disable_loadbalance = disable_loadbalance
         self.lock_to_backend = self.get_lock_to_backend() if override_model_select is False else None
+        self.comfyui_json = comfyui_json
 
         self.total_images = (self.payload.get("batch_size", 1) * self.payload.get("n_iter", 1)) or 1
 
@@ -703,12 +704,22 @@ class TaskHandler(StaticHandler):
         return None
 
     async def txt2img(self):
-        self.instance_list, self.enable_backend = await TXT2IMGHandler(self.payload).get_all_instance()
+
+        self.instance_list, self.enable_backend = await TXT2IMGHandler(
+            self.payload,
+            comfyui_task=self.comfyui_json
+        ).get_all_instance()
+
         await self.choice_backend()
         return self.result
 
     async def img2img(self):
-        self.instance_list, self.enable_backend = await IMG2IMGHandler(self.payload).get_all_instance()
+
+        self.instance_list, self.enable_backend = await IMG2IMGHandler(
+            self.payload,
+            comfyui_task=self.comfyui_json
+        ).get_all_instance()
+
         await self.choice_backend()
         return self.result
 
@@ -738,14 +749,11 @@ class TaskHandler(StaticHandler):
         tasks = []
         is_avaiable = 0
         status_dict = {}
-        vram_dict = {}
         ava_url = None
         n = -1
         e = -1
-        defult_eta = 20
         normal_backend = None
         idle_backend = []
-        slice = [24]
 
         logger = setup_logger(custom_prefix='[LOAD_BALANCE]')
 
@@ -827,7 +835,9 @@ class TaskHandler(StaticHandler):
             eta = 0
 
             for (site, time_), (_, image_count) in zip(avg_time_dict.items(), backend_image.items()):
-                self.load_balance_logger.info(i18n('Backend: %s Average work time: %s seconds, Current tasks: %s') % (site, time_, image_count - 1))
+                self.load_balance_logger.info(
+                    i18n('Backend: %s Average work time: %s seconds, Current tasks: %s') % (site, time_, image_count - 1)
+                )
                 if site in normal_backend:
                     self.update_backend_status()
                     for key in self.backend_status:

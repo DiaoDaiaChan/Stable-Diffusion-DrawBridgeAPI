@@ -28,7 +28,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.exceptions import HTTPException
 from pathlib import Path
 
-from locales import _
+from .locales import _
 
 app = FastAPI()
 
@@ -137,16 +137,44 @@ class Api:
         return self.app.add_api_route(path, endpoint, **kwargs)
 
     @staticmethod
+    async def generate_handle(data) -> TaskHandler:
+
+        model_to_backend = None
+        if data['override_settings'].get("sd_model_checkpoint", None):
+            model_to_backend = data['override_settings'].get("sd_model_checkpoint", None)
+
+        styles = data.get('styles')
+        selected_style = []
+        selected_comfyui_style = []
+
+        if styles:
+            api_styles = await Api.get_prompt_styles()
+            for index, i in enumerate(api_styles):
+                for style in styles:
+                    if style in i['name']:
+                        if 'comfyui' in i['name']:
+                            logger.info(f"{_('Selected ComfyUI style')} - {style}")
+                            selected_comfyui_style.append(style)
+                        else:
+                            selected_style.append(style)
+
+        if selected_style:
+            for i in selected_style:
+                data['prompt'] = data.get('prompt', '') + i['prompt']
+                data['negative_prompt'] = data.get('negative_prompt', '') + i['negative_prompt']
+
+        task_handler = TaskHandler(data, model_to_backend=model_to_backend, comfyui_json=selected_comfyui_style[0])
+
+        return task_handler
+
+    @staticmethod
     async def txt2img_api(request: request_model.Txt2ImgRequest, api: Request):
 
         data = request.model_dump()
         client_host = api.client.host
-        model_to_backend = None
 
-        if data['override_settings'].get("sd_model_checkpoint", None):
-            model_to_backend = data['override_settings'].get("sd_model_checkpoint", None)
+        task_handler = await Api.generate_handle(data)
 
-        task_handler = TaskHandler(data, model_to_backend=model_to_backend)
         try:
             logger.info(f"{_('Exec TXT2IMG')} - {client_host}")
             result = await task_handler.txt2img()
@@ -167,7 +195,7 @@ class Api:
         if len(data['init_images']) == 0:
             raise HTTPException(status_code=400, detail=_('IMG2IMG Requires image to start'))
 
-        task_handler = TaskHandler(data)
+        task_handler = await Api.generate_handle(data)
 
         try:
             logger.info(f"{_('Exec IMG2IMG')} - {client_host}")
@@ -269,7 +297,7 @@ class Api:
         return
 
     @staticmethod
-    async def topaz_ai(request: request_model.TopzAiRequest):
+    async def topaz_ai(request: request_model.TopazAiRequest):
         data = request.model_dump()
 
         unique_id = str(uuid.uuid4())
@@ -337,7 +365,8 @@ class Api:
 
         return base64_image
 
-    async def get_prompt_styles(self):
+    @staticmethod
+    async def get_prompt_styles():
 
         if StaticHandler.prompt_style:
             return StaticHandler.get_prompt_style()

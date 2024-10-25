@@ -60,6 +60,7 @@ class Txt2ImgRequest(RequetModelClass):
     send_images: bool = True
     save_images: bool = True
     alwayson_scripts: Dict[str, Any] = {}
+    scheduler: str = "Automatic"
 
 
 class Img2ImgRequest(RequetModelClass):
@@ -115,6 +116,7 @@ class Img2ImgRequest(RequetModelClass):
     send_images: bool = True
     save_images: bool = True
     alwayson_scripts: Dict[str, Any] = {}
+    scheduler: str = "Automatic"
     # 以下为拓展
 
 
@@ -125,7 +127,7 @@ class TaggerRequest(RequetModelClass):
     exclude_tags: Optional[List[str]] = []
 
 
-class TopzAiRequest(BaseModel):
+class TopazAiRequest(BaseModel):
     image: Optional[str] = None
     input_folder: Optional[str or Path]
     output_folder: Optional[str] = None
