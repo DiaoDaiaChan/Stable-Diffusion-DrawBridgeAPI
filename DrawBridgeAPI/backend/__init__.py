@@ -47,7 +47,7 @@ class BaseHandler:
         self.config = init_instance.config
         self.all_task_list = list(range(len(list(self.config.name_url[0].keys()))))
         self.enable_backend: dict = {}
-        self.comfyui_task: str = 'sdbase_txt2img' or comfyui_task
+        self.comfyui_task: str = comfyui_task
 
     async def get_enable_task(
         self,
@@ -184,19 +184,26 @@ class BaseHandler:
 
         hr_mode = self.payload.get('enable_hr', None)
 
-        self.comfyui_task = "sdbase_txt2img_hr_fix" if hr_mode else "sdbase_txt2img"
-
-        img2img = self.payload.get("init_images", [])
-        if img2img:
-            self.comfyui_task = "sdbase_img2img"
-
         for i in self.config.comfyui['name']:
+
+            try:
+                selected_task = (
+                "sdbase_txt2img_hr_fix" if hr_mode
+                else self.config.comfyui.get('default_workflows', ['sdbase_txt2img'])[counter]
+                )
+            except IndexError:
+                selected_task = "sdbase_txt2img"
+
+            img2img = self.payload.get("init_images", [])
+            if img2img:
+                selected_task = "sdbase_img2img"
+
             aidraw_instance = AIDRAW9(
                 count=counter,
                 payload=self.payload,
                 request=self.request,
                 path=self.path,
-                comfyui_api_json=self.comfyui_task
+                comfyui_api_json=self.comfyui_task or selected_task
             )
             counter += 1
             instance_list.append(aidraw_instance)
@@ -236,6 +243,9 @@ class BaseHandler:
 
 class TXT2IMGHandler(BaseHandler):
 
+    def __init__(self, payload=None, comfyui_task: str = None):
+        super().__init__(comfyui_task=comfyui_task, payload=payload)
+
     async def get_all_instance(self) -> tuple[list[Backend], dict]:
         # 手动选择启动的后端
         man_enable_task = self.config.server_settings['enable_txt2img_backends']
@@ -250,6 +260,9 @@ class TXT2IMGHandler(BaseHandler):
 
 
 class IMG2IMGHandler(BaseHandler):
+
+    def __init__(self, payload=None, comfyui_task: str = None):
+        super().__init__(comfyui_task=comfyui_task, payload=payload)
 
     async def get_all_instance(self) -> tuple[list[Backend], dict]:
         # 手动选择启动的后端
@@ -665,7 +678,7 @@ class TaskHandler(StaticHandler):
         reutrn_instance: bool = False,
         model_to_backend: str = None,
         disable_loadbalance: bool = False,
-        comfyui_json: Path = None,
+        comfyui_json: str = "",
         override_model_select: bool = False,
     ):
         self.payload = payload
@@ -679,7 +692,7 @@ class TaskHandler(StaticHandler):
         self.model_to_backend = model_to_backend  # 模型的名称
         self.disable_loadbalance = disable_loadbalance
         self.lock_to_backend = self.get_lock_to_backend() if override_model_select is False else None
-        self.comfyui_json = comfyui_json
+        self.comfyui_json: str = comfyui_json
 
         self.total_images = (self.payload.get("batch_size", 1) * self.payload.get("n_iter", 1)) or 1
 

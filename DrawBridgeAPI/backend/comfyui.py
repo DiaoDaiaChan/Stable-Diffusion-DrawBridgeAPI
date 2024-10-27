@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import json
+import random
 import time
 import traceback
 import uuid
@@ -11,6 +12,8 @@ import base64
 import aiohttp
 
 from .base import Backend
+
+global __ALL_SUPPORT_NODE__
 
 
 class AIDRAW(Backend):
@@ -25,7 +28,7 @@ class AIDRAW(Backend):
         self.workload_name = f"{self.backend_name}-{backend}"
 
         self.current_config: dict = self.config.comfyui_setting
-        self.model = f"Comfyui - {self.current_config['model'][self.count]}"
+        self.model = f"Comfyui - {self.current_config['name'][self.count]}"
         self.backend_url = self.current_config['backend_url'][self.count]
 
         self.reflex_dict['sampler'] = {
@@ -80,10 +83,10 @@ class AIDRAW(Backend):
         if self.comfyui_api_json:
 
             with open(
-                    Path(f"{os.path.dirname(os.path.abspath(__file__))}/../comfyui_workflows/{self.comfyui_api_json}.json").resolve(), 'r') as f:
+                    Path(f"{os.path.dirname(os.path.abspath(__file__))}/../comfyui_workflows/{self.comfyui_api_json}.json").resolve(), 'r', encoding='utf-8') as f:
                 self.comfyui_api_json = json.load(f)
             with open(
-                    Path(f"{os.path.dirname(os.path.abspath(__file__))}/../comfyui_workflows/{path_to_json}_reflex.json").resolve(), 'r') as f:
+                    Path(f"{os.path.dirname(os.path.abspath(__file__))}/../comfyui_workflows/{path_to_json}_reflex.json").resolve(), 'r', encoding='utf-8') as f:
                 self.comfyui_api_json_reflex = json.load(f)
 
     async def heart_beat(self, id_):
@@ -223,7 +226,8 @@ class AIDRAW(Backend):
 
     def update_api_json(self, init_images):
         api_json = copy.deepcopy(self.comfyui_api_json)
-        self.logger.info(api_json)
+
+        print(api_json)
 
         update_mapping = {
             "sampler": {
@@ -233,6 +237,9 @@ class AIDRAW(Backend):
                 "sampler_name": self.sampler,
                 "scheduler": self.scheduler,
                 "denoise": self.denoising_strength
+            },
+            "seed": {
+                "seed": self.seed
             },
             "image_size": {
                 "width": self.width,
@@ -273,16 +280,53 @@ class AIDRAW(Backend):
             "hr_negative_prompt": {
                     "text": self.hr_negative_prompt
             },
+            "tipo": {
+                "width": self.width,
+                "height": self.height,
+                "seed": self.seed,
+                "tags": self.tags,
+            },
+            "append_prompt": {
 
+            }
         }
 
+        __OVERRIDE_SUPPORT_KEYS__ = {'keep', 'append_prompt', 'append_negative_prompt', 'remove', "randint"}
+        __ALL_SUPPORT_NODE__ = set(update_mapping.keys())
+
         for item, node_id in self.comfyui_api_json_reflex.items():
+
             if node_id:
-                node_id = [str(node_id)] if isinstance(node_id, int) else node_id
-                for id_ in node_id:
-                    update_dict = api_json.get(id_, None)
-                    if update_dict and item in update_mapping:
-                        api_json[id_]['inputs'].update(update_mapping[item])
+                if isinstance(node_id, dict):
+                    temp_dict = copy.deepcopy(update_mapping)
+                    for node, override_dict in node_id.items():
+                        single_node_or = override_dict.get("override", {})
+
+                        for key, override_action in single_node_or.items():
+
+                            if override_action == "randint":
+                                temp_dict[item][key] = random.randint(0, 99999)
+
+                            elif override_action == "keep":
+                                continue
+
+                            elif override_action == "append_prompt":
+                                prompt = api_json[node]['inputs'][key]
+                                prompt = self.tags + prompt
+                                api_json[node]['inputs'][key] = prompt
+
+                            elif override_action == "append_negative_prompt":
+                                prompt = api_json[node]['inputs'][key]
+                                prompt = self.ntags + prompt
+                                api_json[node]['inputs'][key] = prompt
+
+                else:
+                    node_id = [str(node_id)] if isinstance(node_id, int) else node_id
+
+                    for id_ in node_id:
+                        update_dict = api_json.get(id_, None)
+                        if update_dict and item in update_mapping:
+                            api_json[id_]['inputs'].update(update_mapping[item])
 
         test_dict = {
             "sampler": 3,
@@ -299,15 +343,21 @@ class AIDRAW(Backend):
             "output": 9
         }
 
-        self.logger.info(api_json)
+        print(api_json)
         self.comfyui_api_json = api_json
 
     async def upload_base64_image(self, b64_image, name, image_type="input", overwrite=False):
 
+        if b64_image.startswith("data:image"):
+            header, b64_image = b64_image.split(",", 1)
+            file_type = header.split(";")[0].split(":")[1].split("/")[1]
+        else:
+            raise ValueError("Invalid base64 image format.")
+
         image_data = base64.b64decode(b64_image)
 
         data = aiohttp.FormData()
-        data.add_field('image', image_data, filename=f"{name}.png", content_type='image/png')
+        data.add_field('image', image_data, filename=f"{name}.{file_type}", content_type=f'image/{file_type}')
         data.add_field('type', image_type)
         data.add_field('overwrite', str(overwrite).lower())
 

@@ -143,27 +143,34 @@ class Api:
         if data['override_settings'].get("sd_model_checkpoint", None):
             model_to_backend = data['override_settings'].get("sd_model_checkpoint", None)
 
-        styles = data.get('styles')
+        styles = data.get('styles', [])
         selected_style = []
         selected_comfyui_style = []
 
+        logger.error(styles)
+
         if styles:
-            api_styles = await Api.get_prompt_styles()
+            api_styles = StaticHandler.get_prompt_style()
+
             for index, i in enumerate(api_styles):
                 for style in styles:
                     if style in i['name']:
                         if 'comfyui' in i['name']:
-                            logger.info(f"{_('Selected ComfyUI style')} - {style}")
-                            selected_comfyui_style.append(style)
+                            logger.info(f"{_('Selected ComfyUI style')} - {i['name']}")
+                            selected_comfyui_style.append(i['name'])
                         else:
-                            selected_style.append(style)
+                            selected_style.append(i['name'])
 
         if selected_style:
             for i in selected_style:
                 data['prompt'] = data.get('prompt', '') + i['prompt']
                 data['negative_prompt'] = data.get('negative_prompt', '') + i['negative_prompt']
 
-        task_handler = TaskHandler(data, model_to_backend=model_to_backend, comfyui_json=selected_comfyui_style[0])
+        task_handler = TaskHandler(
+            data,
+            model_to_backend=model_to_backend,
+            comfyui_json=selected_comfyui_style[0].replace('comfyui-work-flows-', '') if selected_comfyui_style else None
+        )
 
         return task_handler
 
@@ -368,26 +375,23 @@ class Api:
     @staticmethod
     async def get_prompt_styles():
 
-        if StaticHandler.prompt_style:
-            return StaticHandler.get_prompt_style()
-        else:
-            task_list = []
-            path = '/sdapi/v1/prompt-styles'
+        task_list = []
+        path = '/sdapi/v1/prompt-styles'
 
-            task_handler = TaskHandler({}, None, path, reutrn_instance=True, override_model_select=True)
-            instance_list: list[Backend] = await task_handler.txt2img()
+        task_handler = TaskHandler({}, None, path, reutrn_instance=True, override_model_select=True)
+        instance_list: list[Backend] = await task_handler.txt2img()
 
-            for i in instance_list:
-                task_list.append(i.get_all_prompt_style())
-            resp = await asyncio.gather(*task_list)
+        for i in instance_list:
+            task_list.append(i.get_all_prompt_style())
+        resp = await asyncio.gather(*task_list)
 
-            api_respond = []
-            for i in resp:
-                api_respond += i
+        api_respond = []
+        for i in resp:
+            api_respond += i
 
-            StaticHandler.set_prompt_style(api_respond)
+        StaticHandler.set_prompt_style(api_respond)
 
-            return api_respond
+        return api_respond
 
     async def init_api(self):
         await self.get_sd_models()

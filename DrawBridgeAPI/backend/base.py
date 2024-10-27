@@ -852,8 +852,9 @@ class Backend:
             json_files = PATH_TO_COMFYUI_WORKFLOWS.glob("**/*.json")
 
             for json_file in json_files:
-                prefixed_filename = f"comfyui-work-flows-{json_file.name}"
-                work_flows.append({"name": prefixed_filename, "prompt": "", "negative_prompt": ""})
+                prefixed_filename = f"comfyui-work-flows-{json_file.name}".replace('.json', '')
+                if not json_file.name.endswith("_reflex.json"):
+                    work_flows.append({"name": prefixed_filename, "prompt": "", "negative_prompt": ""})
 
             return work_flows
 

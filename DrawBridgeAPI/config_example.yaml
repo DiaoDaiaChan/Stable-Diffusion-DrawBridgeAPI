@@ -127,6 +127,8 @@ comfyui_setting:
     - default
   model:
     - models\\1053-S.ckpt
+  default_workflows:
+    - 'sdbase_txt2img'
 
 novelai_setting:
   token:
