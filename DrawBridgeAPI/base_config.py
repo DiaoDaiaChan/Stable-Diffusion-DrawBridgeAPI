@@ -309,7 +309,7 @@ _____                              ____           _       _                     
         try:
             db_index = config.server_settings['redis_server'][3]
         except IndexError:
-            db_index = 24
+            db_index = 15
 
         self.redis_client = redis.Redis(
             host=config.server_settings['redis_server'][0],

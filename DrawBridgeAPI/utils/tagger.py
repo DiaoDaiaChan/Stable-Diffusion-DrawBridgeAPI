@@ -216,7 +216,7 @@ class WaifuDiffusionTaggerHandler:
         return wd_instance
 
     async def tagger_main(self, base64_img, threshold, ntags=[], audit=False, ratings=False):
-        if base64_img.startswith(b"data:image/png;base64,"):
+        if base64_img.startswith("data:image/png;base64,"):
             base64_img = base64_img.replace("data:image/png;base64,", "")
 
         image_data = base64.b64decode(base64_img)

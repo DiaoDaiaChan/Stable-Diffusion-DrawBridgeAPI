@@ -1,6 +1,6 @@
 [project]
 name = "stable-diffusion-drawbridge-api"
-version = "1.2.1"
+version = "1.2.2"
 description = "使用标准A1111-SDWEBUI API来调用各种绘画后端的多功能负载均衡API"
 authors = [
     {name = "DiaoDaiaChan", email = "diaodaiachan@qq.com"},

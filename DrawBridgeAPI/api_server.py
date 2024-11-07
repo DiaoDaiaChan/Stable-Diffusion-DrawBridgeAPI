@@ -20,7 +20,6 @@ os.environ['FAL_KEY'] = 'Daisuki'
 path_env = os.getenv("CONF_PATH")
 
 from .utils import request_model, topaz, run_later
-from .ui import create_gradio_interface
 from .base_config import setup_logger, init_instance
 
 from fastapi import FastAPI, Request
@@ -434,8 +433,8 @@ async def startup_event():
 
 if __name__ == "__main__":
 
-    if config.server_settings['start_gradio']:
-        demo = create_gradio_interface(host, port)
-        app = gradio.mount_gradio_app(api_instance.app, demo, path="/")
+    # if config.server_settings['start_gradio']:
+    #     demo = create_gradio_interface(host, port)
+    #     app = gradio.mount_gradio_app(api_instance.app, demo, path="/")
 
     uvicorn.run(api_instance.app, host=host, port=port)

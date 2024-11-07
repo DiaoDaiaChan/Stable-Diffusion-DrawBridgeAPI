@@ -14,7 +14,7 @@ import aiohttp
 from .base import Backend
 
 global __ALL_SUPPORT_NODE__
-
+MAX_SEED = 2 ** 32
 
 class AIDRAW(Backend):
 
@@ -226,6 +226,7 @@ class AIDRAW(Backend):
 
     def update_api_json(self, init_images):
         api_json = copy.deepcopy(self.comfyui_api_json)
+        raw_api_json = copy.deepcopy(self.comfyui_api_json)
 
         print(api_json)
 
@@ -239,7 +240,8 @@ class AIDRAW(Backend):
                 "denoise": self.denoising_strength
             },
             "seed": {
-                "seed": self.seed
+                "seed": self.seed,
+                "noise_seed": self.seed
             },
             "image_size": {
                 "width": self.width,
@@ -291,42 +293,97 @@ class AIDRAW(Backend):
             }
         }
 
-        __OVERRIDE_SUPPORT_KEYS__ = {'keep', 'append_prompt', 'append_negative_prompt', 'remove', "randint"}
+        __OVERRIDE_SUPPORT_KEYS__ = {
+            'keep',
+            'value',
+            'append_prompt',
+            'append_negative_prompt',
+            'remove',
+            "randint",
+            "get_text",
+            "upscale",
+            'image'
+
+        }
         __ALL_SUPPORT_NODE__ = set(update_mapping.keys())
 
         for item, node_id in self.comfyui_api_json_reflex.items():
 
-            if node_id:
-                if isinstance(node_id, dict):
-                    temp_dict = copy.deepcopy(update_mapping)
-                    for node, override_dict in node_id.items():
+            if node_id and item not in ("override", "note"):
+
+                org_node_id = node_id
+
+                if isinstance(node_id, list):
+                    node_id = node_id
+                elif isinstance(node_id, int or str):
+                    node_id = [node_id]
+                elif isinstance(node_id, dict):
+                    node_id = list(node_id.keys())
+
+                for id_ in node_id:
+                    id_ = str(id_)
+                    update_dict = api_json.get(id_, None)
+                    if update_dict and item in update_mapping:
+                        api_json[id_]['inputs'].update(update_mapping[item])
+
+                if isinstance(org_node_id, dict):
+                    for node, override_dict in org_node_id.items():
                         single_node_or = override_dict.get("override", {})
 
-                        for key, override_action in single_node_or.items():
+                        if single_node_or:
+                            for key, override_action in single_node_or.items():
 
-                            if override_action == "randint":
-                                temp_dict[item][key] = random.randint(0, 99999)
+                                if override_action == "randint":
+                                    api_json[node]['inputs'][key] = random.randint(0, MAX_SEED)
 
-                            elif override_action == "keep":
-                                continue
+                                elif override_action == "keep":
+                                    org_cons = raw_api_json[node]['inputs'][key]
 
-                            elif override_action == "append_prompt":
-                                prompt = api_json[node]['inputs'][key]
-                                prompt = self.tags + prompt
-                                api_json[node]['inputs'][key] = prompt
+                                elif override_action == "append_prompt":
+                                    prompt = raw_api_json[node]['inputs'][key]
+                                    prompt = self.tags + prompt
+                                    api_json[node]['inputs'][key] = prompt
 
-                            elif override_action == "append_negative_prompt":
-                                prompt = api_json[node]['inputs'][key]
-                                prompt = self.ntags + prompt
-                                api_json[node]['inputs'][key] = prompt
+                                elif override_action == "append_negative_prompt":
+                                    prompt = raw_api_json[node]['inputs'][key]
+                                    prompt = self.ntags + prompt
+                                    api_json[node]['inputs'][key] = prompt
 
-                else:
-                    node_id = [str(node_id)] if isinstance(node_id, int) else node_id
+                                elif "upscale" in override_action:
+                                    scale = 1.5
+                                    if "_" in override_action:
+                                        scale = override_action.split("_")[1]
 
-                    for id_ in node_id:
-                        update_dict = api_json.get(id_, None)
-                        if update_dict and item in update_mapping:
-                            api_json[id_]['inputs'].update(update_mapping[item])
+                                    if key == 'width':
+                                        res = self.width
+                                    elif key == 'height':
+                                        res = self.height
+
+                                    upscale_size = int(res * scale)
+                                    api_json[node]['inputs'][key] = upscale_size
+
+                                elif "value" in override_action:
+                                    override_value = raw_api_json[node]['inputs'][key]
+                                    if "_" in override_action:
+                                        override_value = override_action.split("_")[1]
+                                        override_type = override_action.split("_")[2]
+                                        if override_type == "int":
+                                            override_value = int(override_value)
+                                        elif override_type == "float":
+                                            override_value = float(override_value)
+                                        elif override_type == "str":
+                                            override_value = str(override_value)
+
+                                    api_json[node]['inputs'][key] = override_value
+
+                                elif "image" in override_action:
+                                    image_id = int(override_action.split("_")[1])
+                                    api_json[node]['inputs'][key] = init_images[image_id]['name']
+
+                        else:
+                            update_dict = api_json.get(node, None)
+                            if update_dict and item in update_mapping:
+                                api_json[node]['inputs'].update(update_mapping[item])
 
         test_dict = {
             "sampler": 3,
