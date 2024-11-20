@@ -4,24 +4,9 @@ import redis
 import json
 import logging
 import os
-import traceback
-import sys
 
-import pydantic
-from packaging import version
-
-pyd_version = pydantic.__version__
-
-if version.parse(pyd_version) < version.parse("2.0"):
-    from pydantic import BaseSettings
-else:
-    try:
-        from pydantic_settings import BaseSettings
-    except:
-        traceback.print_exc()
-        import subprocess
-        subprocess.run([sys.executable, "-m", "pip", "install", "pydantic_settings"])
-        from pydantic_settings import BaseSettings
+from pydantic import BaseModel
+from typing import Dict, List
 
 from pathlib import Path
 
@@ -132,49 +117,14 @@ def setup_logger(custom_prefix="[MAIN]"):
     return logger
 
 
-class Config(BaseSettings):
+class Config(BaseModel):
 
     backend_name_list: list = []
 
-    server_settings: dict = None
-
-    civitai_setting: dict = empty_dict
-    a1111webui_setting: dict = {"backend_url": None}
-    fal_ai_setting: dict = empty_dict
-    replicate_setting: dict = empty_dict
-    liblibai_setting: dict = empty_dict
-    tusiart_setting: dict = empty_dict
-    seaart_setting: dict = empty_dict
-    yunjie_setting: dict = empty_dict
-    comfyui_setting: dict = empty_dict
-    novelai_setting: dict = empty_dict
-    midjourney_setting: dict = empty_dict
-
-    civitai: list or None = []
-    a1111webui: list = []
-    fal_ai: list = []
-    replicate: list = []
-    liblibai: list = []
-    tusiart: list = []
-    seaart: list = []
-    yunjie: list = []
-    comfyui: list = []
-    novelai: list = []
-    midjourney: list = []
-
-    civitai_name: dict = {}
-    a1111webui_name: dict = {}
-    fal_ai_name: dict = {}
-    replicate_name: dict = {}
-    liblibai_name: dict = {}
-    tusiart_name: dict = {}
-    seaart_name: dict = {}
-    yunjie_name: dict = {}
-    comfyui_name: dict = {}
-    novelai_name: dict = {}
-    midjourney_name: dict = {}
-
     server_settings: dict = {}
+    enable_backends: Dict[str, Dict[str, List[int | Dict]]] = {}
+    backends: dict = {}
+
     retry_times: int = 3
     proxy: str = ''
 
@@ -221,9 +171,6 @@ class ConfigInit:
         self.config_file_path = config_file_path
         config = self.load_config()
 
-        config.backend_name_list = ['civitai', 'a1111', 'falai', 'replicate', 'liblibai', 'tusiart', 'seaart', 'yunjie',
-                                    'comfyui', 'novelai', 'midjourney']
-
         welcome_txt = '''
 欢迎使用 
 _____                              ____           _       _                               _____    _____ 
@@ -240,66 +187,11 @@ _____                              ____           _       _                     
 
         print(welcome_txt)
 
-        config.civitai = config.civitai_setting['token']
-        config.a1111webui = config.a1111webui_setting
-        config.fal_ai = config.fal_ai_setting['token']
-        config.replicate = config.replicate_setting['token']
-        config.liblibai = config.liblibai_setting['token']
-        config.tusiart = config.tusiart_setting['token']
-        config.seaart = config.seaart_setting['token']
-        config.yunjie = config.yunjie_setting['token']
-        config.comfyui = config.comfyui_setting
-        config.novelai = config.novelai_setting['token']
-        config.midjourney = config.midjourney_setting
-
-        sources_list = [
-            (config.civitai, 0, config.civitai_name),
-            (config.a1111webui, 1, config.a1111webui_name),
-            (config.fal_ai, 2, config.fal_ai_name),
-            (config.replicate, 3, config.replicate_name),
-            (config.liblibai, 4, config.liblibai_name),
-            (config.tusiart, 5, config.tusiart_name),
-            (config.seaart, 6, config.seaart_name),
-            (config.yunjie, 7, config.yunjie_name),
-            (config.comfyui, 8, config.comfyui_name),
-            (config.novelai, 9, config.novelai_name),
-            (config.midjourney, 10, config.midjourney_name),
-        ]
-
-        def process_items(config, items, backend_index, name_dict):
-            if backend_index == 1:  # 特殊处理 config.a1111webui
-                for i in range(len(items['name'])):
-                    key = f"{config.backend_name_list[backend_index]}-{items['name'][i]}"
+        for backend_type, api in config.backends.items():
+            if api:
+                for name in api['name']:
+                    key = f"{backend_type}-{name}"
                     config.workload_dict[key] = config.base_workload_dict
-                    name_dict[f"a1111-{items['name'][i]}"] = items['backend_url'][i]
-            elif backend_index == 8:
-                for i in range(len(items['name'])):
-                    key = f"{config.backend_name_list[backend_index]}-{items['name'][i]}"
-                    config.workload_dict[key] = config.base_workload_dict
-                    name_dict[f"comfyui-{items['name'][i]}"] = items['backend_url'][i]
-            elif backend_index == 10:
-                for i in range(len(items['name'])):
-                    key = f"{config.backend_name_list[backend_index]}-{items['name'][i]}"
-                    config.workload_dict[key] = config.base_workload_dict
-                    name_dict[f"midjourney-{items['name'][i]}"] = items['backend_url'][i]
-            else:
-                for n in items:
-                    key = f"{config.backend_name_list[backend_index]}-{n}"
-                    config.workload_dict[key] = config.base_workload_dict
-                    name_dict[key] = n
-
-        for items, backend_index, name_dict in sources_list:
-            process_items(config, items, backend_index, name_dict)
-
-        def merge_and_count(*args):
-            merged_dict = {}
-            lengths = []
-            for arg in args:
-                merged_dict |= arg[2]
-                lengths.append(len(arg[0]))
-            return merged_dict, tuple(lengths)
-
-        config.name_url = merge_and_count(*sources_list)
 
         models_dict = {}
         models_dict['is_loaded'] = False

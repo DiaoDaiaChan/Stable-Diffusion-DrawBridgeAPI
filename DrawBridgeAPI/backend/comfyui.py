@@ -12,24 +12,21 @@ import base64
 import aiohttp
 
 from .base import Backend
+from ..utils import run_later
 
 global __ALL_SUPPORT_NODE__
 MAX_SEED = 2 ** 32
 
+
 class AIDRAW(Backend):
 
-    def __init__(self, count, payload, **kwargs):
-        super().__init__(count=count, payload=payload, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         # 需要更改
-        self.model_hash = "c7352c5d2f"
         self.logger = self.setup_logger('[Comfyui]')
-        backend = self.config.comfyui['name'][self.count]
-        self.backend_name = self.config.backend_name_list[8]
-        self.workload_name = f"{self.backend_name}-{backend}"
 
-        self.current_config: dict = self.config.comfyui_setting
-        self.model = f"Comfyui - {self.current_config['name'][self.count]}"
-        self.backend_url = self.current_config['backend_url'][self.count]
+        self.comfyui_api_json = "sdbase_txt2img"
+        self.comfyui_api_json_reflex = None
 
         self.reflex_dict['sampler'] = {
             "DPM++ 2M": "dpmpp_2m",
@@ -76,8 +73,6 @@ class AIDRAW(Backend):
         self.scheduler = self.reflex_dict['scheduler'].get(self.scheduler, "normal")
         self.sampler = self.reflex_dict['sampler'].get(self.sampler, "euler")
 
-        self.model_path = self.config.comfyui['model'][self.count]
-
         self.logger.info(f"选择工作流{self.comfyui_api_json}")
         path_to_json = self.comfyui_api_json
         if self.comfyui_api_json:
@@ -96,16 +91,19 @@ class AIDRAW(Backend):
 
             response = await self.http_request(
                 method="GET",
-                target_url=f"{self.backend_url}/history/{id_}",
+                target_url=f"{self.backend_id}/history/{id_}",
             )
 
             if response:
                 for img in response[id_]['outputs'][str(self.comfyui_api_json_reflex.get('output', 9))]['images']:
-                    img_url = f"{self.backend_url}/view?filename={img['filename']}"
+                    if img['subfolder'] == "":
+                        img_url = f"{self.backend_id}/view?filename={img['filename']}"
+                    else:
+                        img_url = f"{self.backend_id}/view?filename={img['filename']}&subfolder={img['subfolder']}"
                     self.img_url.append(img_url)
 
         async with aiohttp.ClientSession() as session:
-            ws_url = f'{self.backend_url}/ws?clientId={self.client_id}'
+            ws_url = f'{self.backend_id}/ws?clientId={self.client_id}'
             async with session.ws_connect(ws_url) as ws:
 
                 self.logger.info(f"WS连接成功: {ws_url}")
@@ -144,7 +142,6 @@ class AIDRAW(Backend):
                     #         images_output.append(bytes_msg[8:])
                     #         output_images[current_node] = images_output
 
-
                     elif msg.type == aiohttp.WSMsgType.ERROR:
                         self.logger.error(f"Error: {msg.data}")
                         await ws.close()
@@ -159,12 +156,10 @@ class AIDRAW(Backend):
 
     async def get_backend_working_progress(self):
 
-        self.get_backend_id()
-
         try:
             response = await self.http_request(
                 method="GET",
-                target_url=f"{self.backend_url}/queue",
+                target_url=f"{self.backend_id}/queue",
             )
             if response.get("error", None):
                 available = False
@@ -182,7 +177,7 @@ class AIDRAW(Backend):
         except:
             traceback.print_exc()
         finally:
-            return build_resp, sc, self.backend_url, sc
+            return build_resp, sc, self.backend_id, sc
 
     async def check_backend_usability(self):
         pass
@@ -201,7 +196,7 @@ class AIDRAW(Backend):
                 resp = await self.upload_base64_image(image, uuid.uuid4().hex)
                 upload_img_resp_list.append(resp)
 
-        self.update_api_json(upload_img_resp_list)
+        await self.update_api_json(upload_img_resp_list)
 
         input_ = {
             "client_id": self.client_id,
@@ -210,7 +205,7 @@ class AIDRAW(Backend):
 
         respone = await self.http_request(
             method="POST",
-            target_url=f"{self.backend_url}/prompt",
+            target_url=f"{self.backend_id}/prompt",
             headers=self.headers,
             content=json.dumps(input_)
         )
@@ -224,11 +219,9 @@ class AIDRAW(Backend):
         await self.heart_beat(self.task_id)
         await self.err_formating_to_sd_style()
 
-    def update_api_json(self, init_images):
+    async def update_api_json(self, init_images):
         api_json = copy.deepcopy(self.comfyui_api_json)
         raw_api_json = copy.deepcopy(self.comfyui_api_json)
-
-        print(api_json)
 
         update_mapping = {
             "sampler": {
@@ -249,10 +242,10 @@ class AIDRAW(Backend):
                 "batch_size": self.batch_size
             },
             "prompt": {
-                "text": self.tags
+                "text": self.prompt
             },
             "negative_prompt": {
-                "text": self.ntags
+                "text": self.negative_prompt
             },
             "checkpoint": {
                 "ckpt_name": self.model_path if self.model_path else None
@@ -286,7 +279,7 @@ class AIDRAW(Backend):
                 "width": self.width,
                 "height": self.height,
                 "seed": self.seed,
-                "tags": self.tags,
+                "prompt": self.prompt,
             },
             "append_prompt": {
 
@@ -341,12 +334,12 @@ class AIDRAW(Backend):
 
                                 elif override_action == "append_prompt":
                                     prompt = raw_api_json[node]['inputs'][key]
-                                    prompt = self.tags + prompt
+                                    prompt = self.prompt + prompt
                                     api_json[node]['inputs'][key] = prompt
 
                                 elif override_action == "append_negative_prompt":
                                     prompt = raw_api_json[node]['inputs'][key]
-                                    prompt = self.ntags + prompt
+                                    prompt = self.negative_prompt + prompt
                                     api_json[node]['inputs'][key] = prompt
 
                                 elif "upscale" in override_action:
@@ -385,23 +378,22 @@ class AIDRAW(Backend):
                             if update_dict and item in update_mapping:
                                 api_json[node]['inputs'].update(update_mapping[item])
 
-        test_dict = {
-            "sampler": 3,
-            "image_size": 5,
-            "prompt": 6,
-            "negative_prompt": 7,
-            "checkpoint": 4,
-            "latentupscale": 10,
-            "load_image": 0,
-            "resize": 15,
-            "hr_steps": 19,
-            "hr_prompt": 21,
-            "hr_negative_prompt": 22,
-            "output": 9
-        }
-
-        print(api_json)
+        await run_later(self.compare_dicts(api_json, self.comfyui_api_json), 0.5)
         self.comfyui_api_json = api_json
+
+    async def compare_dicts(self, dict1, dict2):
+
+        modified_keys = {k for k in dict1.keys() & dict2.keys() if dict1[k] != dict2[k]}
+        build_info = "节点映射情况: \n"
+        for key in modified_keys:
+            build_info += f"节点ID: {key} -> \n"
+            for (key1, value1), (key2, value2) in zip(dict1[key].items(), dict2[key].items()):
+                if value1 == value2:
+                    pass
+                else:
+                    build_info += f"新的值: {key1} -> {value1}\n旧的值: {key2} -> {value2}\n"
+
+        self.logger.info(build_info)
 
     async def upload_base64_image(self, b64_image, name, image_type="input", overwrite=False):
 
@@ -419,5 +411,5 @@ class AIDRAW(Backend):
         data.add_field('overwrite', str(overwrite).lower())
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(f"{self.backend_url}/upload/image", data=data) as response:
+            async with session.post(f"{self.backend_id}/upload/image", data=data) as response:
                 return json.loads(await response.read())

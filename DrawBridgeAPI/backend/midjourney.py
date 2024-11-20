@@ -18,19 +18,13 @@ from pathlib import Path
 
 class AIDRAW(Backend):
 
-    def __init__(self, count, payload, **kwargs):
-        super().__init__(count=count, payload=payload, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
-        self.model = f"MidJourney"
-        self.model_hash = "c7352c5d2f"
         self.logger = self.setup_logger('[MidJourney]')
 
-        self.backend_url = self.config.midjourney['backend_url'][self.count]
-        self.backend_name = self.config.backend_name_list[10]
-        self.workload_name = f"{self.backend_name}-{self.config.midjourney['name'][self.count]}"
-
     async def heart_beat(self, id_):
-        task_url = f"{self.backend_url}/mj/task/{id_}/fetch"
+        task_url = f"{self.backend_id}/mj/task/{id_}/fetch"
 
         while True:
             try:
@@ -80,7 +74,6 @@ class AIDRAW(Backend):
             except Exception as e:
                 self.logger.error(f"任务{id_}心跳监控出错: {str(e)}")
                 raise
-
 
     async def update_progress(self):
         # 覆写函数
@@ -140,9 +133,9 @@ class AIDRAW(Backend):
 
         accept_ratio = await self.get_shape()
 
-        ntags = f"--no {self.ntags}" if self.ntags else ""
+        ntags = f"--no {self.negative_prompt}" if self.negative_prompt else ""
 
-        build_prompt = f"{self.tags} --ar {accept_ratio} --seed {self.seed}" + ' ' + ntags + ' '
+        build_prompt = f"{self.prompt} --ar {accept_ratio} --seed {self.seed}" + ' ' + ntags + ' '
 
         payload = {
             "prompt": build_prompt

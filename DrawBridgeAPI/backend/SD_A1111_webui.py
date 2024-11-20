@@ -5,18 +5,10 @@ from .base import Backend
 
 class AIDRAW(Backend):
 
-    def __init__(self, count, payload, **kwargs):
-        super().__init__(count=count, payload=payload, **kwargs)
-
-        self.model = "StableDiffusion"
-        self.model_hash = "c7352c5d2f"
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
         self.logger = self.setup_logger('[SD-A1111]')
-        self.current_config: dict = self.config.a1111webui_setting
-
-        self.backend_url = self.current_config['backend_url'][self.count]
-        name = self.current_config['name'][self.count]
-        self.backend_name = self.config.backend_name_list[1]
-        self.workload_name = f"{self.backend_name}-{name}"
 
     async def exec_login(self):
         login_data = {
@@ -27,7 +19,7 @@ class AIDRAW(Backend):
 
         response = await self.http_request(
             method="POST",
-            target_url=f"{self.backend_url}/login",
+            target_url=f"{self.backend_id}/login",
             headers={
                 "Content-Type": "application/x-www-form-urlencoded",
                 "accept": "application/json"
@@ -56,10 +48,9 @@ class AIDRAW(Backend):
         获取后端工作进度, 默认A1111
         :return:
         """
-        self.get_backend_id()
         respond = await self.http_request(
             "GET",
-            f"{self.backend_url}/sdapi/v1/options",
+            f"{self.backend_id}/sdapi/v1/options",
             verify=False,
             proxy=False,
             use_aiohttp=False
@@ -74,7 +65,7 @@ class AIDRAW(Backend):
             self.login = True
             await self.exec_login()
 
-        api_url = f"{self.backend_url}/sdapi/v1/progress"
+        api_url = f"{self.backend_id}/sdapi/v1/progress"
 
         resp = await self.http_request(
             method="GET",
@@ -83,6 +74,6 @@ class AIDRAW(Backend):
         )
 
         resp_json = resp.json()
-        return resp_json, resp.status_code, self.backend_url, resp.status_code
+        return resp_json, resp.status_code, self.backend_id, resp.status_code
 
 

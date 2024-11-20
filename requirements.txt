@@ -1,6 +1,6 @@
 aiofiles
 aiohttp
-Pillow>=10.4.0
+Pillow
 civitai-py
 civitai
 colorama

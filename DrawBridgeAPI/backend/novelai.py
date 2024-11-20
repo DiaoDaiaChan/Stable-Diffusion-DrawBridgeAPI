@@ -16,19 +16,10 @@ from pathlib import Path
 
 class AIDRAW(Backend):
 
-    def __init__(self, count, payload, **kwargs):
-        super().__init__(count=count, payload=payload, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
-        self.model = f"NovelAI - {self.config.novelai_setting['model'][self.count]}"
-        self.model_hash = "c7352c5d2f"
         self.logger = self.setup_logger('[NovelAI]')
-
-        token = self.config.novelai[self.count]
-        self.token = token
-        self.backend_name = self.config.backend_name_list[9]
-        self.workload_name = f"{self.backend_name}-{token}"
-
-        self.save_path = Path(f'saved_images/{self.task_type}/{self.current_date}/{self.workload_name[:12]}')
 
         self.reflex_dict['sampler'] = {
             "DPM++ 2M": "k_dpmpp_2m",
@@ -77,7 +68,7 @@ class AIDRAW(Backend):
         self.sampler = self.reflex_dict['sampler'].get(self.sampler, "k_euler_ancestral")
 
         header = {
-            "authorization": "Bearer " + self.token,
+            "authorization": "Bearer " + self.backend_id,
             ":authority": "https://api.novelai.net",
             ":path": "/ai/generate-image",
             "content-type": "application/json",
@@ -99,11 +90,11 @@ class AIDRAW(Backend):
             "seed": self.seed,
             "n_samples": 1,
             "ucPreset": 0,
-            "negative_prompt": self.ntags,
+            "negative_prompt": self.negative_prompt,
         }
 
         json_data = {
-            "input": self.tags,
+            "input": self.prompt,
             "model": self.config.novelai_setting['model'][self.count],
             "parameters": parameters
         }
@@ -142,11 +133,7 @@ class AIDRAW(Backend):
 
         await send_request()
 
-        # self.save_path = self.save_path
-        # self.save_path.mkdir(parents=True, exist_ok=True)
-
         await self.images_to_base64(self.save_path)
-
         await self.err_formating_to_sd_style()
 
     async def images_to_base64(self, save_path):

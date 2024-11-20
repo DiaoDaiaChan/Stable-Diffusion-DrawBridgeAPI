@@ -1,5 +1,7 @@
 import json
 import asyncio
+import subprocess
+
 import gradio as gr
 import os
 os.environ['CIVITAI_API_TOKEN'] = 'kunkun'
@@ -101,5 +103,3 @@ async def create_gradio_interface(host, port):
 async def run_gradio(host, port):
     interface = await create_gradio_interface(host, port)
     interface.launch(server_name=host, server_port=port+1)
-
-asyncio.run(run_gradio("127.0.0.1", 5421))

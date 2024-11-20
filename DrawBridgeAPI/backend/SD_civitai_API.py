@@ -9,18 +9,10 @@ from .base import Backend
 
 class AIDRAW(Backend):
 
-    def __init__(self, count, payload, **kwargs):
-        super().__init__(count=count, payload=payload, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
-        self.model = "Civitai - urn:air:sd1:checkpoint:civitai:4201@130072"
-        self.model_hash = "c7352c5d2f"
         self.logger = self.setup_logger('[Civitai]')
-
-        token = self.config.civitai[self.count]
-        self.token = token
-        self.backend_name = self.config.backend_name_list[0]
-        self.workload_name = f"{self.backend_name}-{token}"
-
 
     async def update_progress(self):
         # 覆写函数
@@ -41,7 +33,7 @@ class AIDRAW(Backend):
 
     async def check_backend_usability(self):
 
-        self.headers['Authorization'] = f"Bearer {self.token}"
+        self.headers['Authorization'] = f"Bearer {self.backend_id}"
         response = await self.http_request(
             method="GET",
             target_url='https://civitai.com/api/v1/models',
@@ -65,18 +57,18 @@ class AIDRAW(Backend):
 
     async def posting(self):
 
-        self.logger.info(f"开始使用{self.token}获取图片")
+        self.logger.info(f"开始使用{self.backend_id}获取图片")
 
-        os.environ['CIVITAI_API_TOKEN'] = self.token
-        os.environ['HTTP_PROXY'] = self.config.civitai_setting['proxy'][self.count]
-        os.environ['HTTPS_PROXY'] = self.config.civitai_setting['proxy'][self.count]
+        os.environ['CIVITAI_API_TOKEN'] = self.backend_id
+        os.environ['HTTP_PROXY'] = self.config.server_settings['proxy']
+        os.environ['HTTPS_PROXY'] = self.config.server_settings['proxy']
         await self.check_backend_usability()
 
         input_ = {
             "model": "urn:air:sd1:checkpoint:civitai:4201@130072",
             "params": {
-                "prompt": self.tags,
-                "negativePrompt": self.ntags,
+                "prompt": self.prompt,
+                "negativePrompt": self.negative_prompt,
                 "scheduler": self.sampler,
                 "steps": self.steps,
                 "cfgScale": self.scale,

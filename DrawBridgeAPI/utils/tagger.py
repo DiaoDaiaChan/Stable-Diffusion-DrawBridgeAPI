@@ -84,7 +84,7 @@ class Interrogator:
             unloaded = True
             print(f'Unloaded {self.name}')
 
-        if hasattr(self, 'tags'):
+        if hasattr(self, 'prompt'):
             del self.tags
 
         return unloaded
@@ -215,7 +215,7 @@ class WaifuDiffusionTaggerHandler:
         wd_logger.info(_("Checkpoint loading completed, waiting for command"))
         return wd_instance
 
-    async def tagger_main(self, base64_img, threshold, ntags=[], audit=False, ratings=False):
+    async def tagger_main(self, base64_img, threshold, ntags=[], audit=False, ratings_=False):
         if base64_img.startswith("data:image/png;base64,"):
             base64_img = base64_img.replace("data:image/png;base64,", "")
 
@@ -228,7 +228,7 @@ class WaifuDiffusionTaggerHandler:
             self.wd_instance.interrogate,
             image
         )
-        if ratings:
+        if ratings_:
             return ratings
         if audit:
             possibilities = ratings
@@ -258,6 +258,7 @@ class WaifuDiffusionTaggerHandler:
             return processed_dict
 
         processed_tags = process_dict(processed_tags)
+
         return {**ratings, **processed_tags}
 
 

@@ -15,17 +15,6 @@ from colorama import init
 init()
 
 from ..base_config import setup_logger, init_instance
-from .SD_civitai_API import AIDRAW
-from .SD_A1111_webui import AIDRAW as AIDRAW2
-from .FLUX_falai import AIDRAW as AIDRAW3
-from .FLUX_replicate import AIDRAW as AIDRAW4
-from .liblibai import AIDRAW as AIDRAW5
-from .tusiart import AIDRAW as AIDRAW6
-from .seaart import AIDRAW as AIDRAW7
-from .yunjie import AIDRAW as AIDRAW8
-from .comfyui import AIDRAW as AIDRAW9
-from .novelai import AIDRAW as AIDRAW10
-from .midjourney import AIDRAW as AIDRAW11
 from .base import Backend
 
 from DrawBridgeAPI.locales import _ as i18n
@@ -45,200 +34,125 @@ class BaseHandler:
         self.request = request
         self.path = path
         self.config = init_instance.config
-        self.all_task_list = list(range(len(list(self.config.name_url[0].keys()))))
+        self.all_task_list = None
         self.enable_backend: dict = {}
         self.comfyui_task: str = comfyui_task
 
     async def get_enable_task(
         self,
-        enable_task
+        task_type,
     ):
         """
         此函数的作用是获取示例并且只保留选择了的后端
         :param enable_task:
         :return:
         """
-        tasks = [
-            self.get_civitai_task(),
-            self.get_a1111_task(),
-            self.get_falai_task(),
-            self.get_replicate_task(),
-            self.get_liblibai_task(),
-            self.get_tusiart_task(),
-            self.get_seaart_task(),
-            self.get_yunjie_task(),
-            self.get_comfyui_task(),
-            self.get_novelai_task(),
-            self.get_midjourney_task()
-        ]
-
-        all_backend_instance = await asyncio.gather(*tasks)
-        all_backend_instance_list = [item for sublist in all_backend_instance for item in sublist]
-
-        # 获取启动的后端字典
-        all_backend_dict: dict = self.config.name_url[0]
-        items = list(all_backend_dict.items())
-        self.enable_backend = dict([items[i] for i in enable_task])
-
-        self.instance_list = [all_backend_instance_list[i] for i in enable_task]
-
-    async def get_civitai_task(self):
-        instance_list = []
-        counter = 0
-        for i in self.config.civitai:
-            if i is not None:
-                aidraw_instance = AIDRAW(count=counter, payload=self.payload)
-                counter += 1
-                instance_list.append(aidraw_instance)
-
-        return instance_list
-
-    async def get_a1111_task(self):
+        enable_backend_list: dict[str, list[int]] = self.config.enable_backends.get(task_type, {})
 
         instance_list = []
-        counter = 0
-        for i in self.config.a1111webui['name']:
-            aidraw_instance = AIDRAW2(
-                count=counter,
-                payload=self.payload,
-                request=self.request,
-                path=self.path
-            )
-            counter += 1
-            instance_list.append(aidraw_instance)
 
-        return instance_list
+        for enable_backend, backend_setting in enable_backend_list.items():
 
-    async def get_falai_task(self):
+            def create_and_append_instances(
+                    enable_backend_type,
+                    AIDRAW_class,
+                    backend_setting,
+                    payload,
+                    instance_list,
+                    extra_args: dict=None
+            ):
 
-        instance_list = []
-        counter = 0
-        for i in self.config.fal_ai:
-            if i is not None:
-                aidraw_instance = AIDRAW3(count=counter, payload=self.payload)
-                counter += 1
-                instance_list.append(aidraw_instance)
+                enable_queue = False
 
-        return instance_list
+                for counter in backend_setting:
+                    if isinstance(counter, int):
+                        enable_queue = False
 
-    async def get_replicate_task(self):
+                    elif isinstance(counter, dict):
+                        operation = list(counter.values())[0]
+                        counter = int(list(counter.keys())[0])
+                        enable_queue = True if operation == "queue" else False
 
-        instance_list = []
-        counter = 0
-        for i in self.config.replicate:
-            if i is not None:
-                aidraw_instance = AIDRAW4(count=counter, payload=self.payload)
-                counter += 1
-                instance_list.append(aidraw_instance)
+                    aidraw_instance = AIDRAW_class(
+                        count=counter,
+                        payload=payload,
+                        enable_queue=enable_queue,
+                        backend_type=enable_backend_type,
+                        **(extra_args if extra_args else {})
+                    )
+                    self.enable_backend.update(
+                        {
+                            self.config.backends[enable_backend_type]["name"][counter]:
+                            self.config.backends[enable_backend_type]["api"][counter]
+                        }
+                    )
+                    aidraw_instance.init_backend_info()
+                    instance_list.append(aidraw_instance)
 
-        return instance_list
+            if "civitai" in enable_backend:
+                from .SD_civitai_API import AIDRAW
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
 
-    async def get_liblibai_task(self):
-        instance_list = []
-        counter = 0
-        for i in self.config.liblibai:
-            if i is not None:
-                aidraw_instance = AIDRAW5(count=counter, payload=self.payload)
-                counter += 1
-                instance_list.append(aidraw_instance)
+            elif "a1111webui" in enable_backend:
+                from .SD_A1111_webui import AIDRAW
 
-        return instance_list
-
-    async def get_tusiart_task(self):
-        instance_list = []
-        counter = 0
-        for i in self.config.tusiart:
-            if i is not None:
-                aidraw_instance = AIDRAW6(count=counter, payload=self.payload)
-                counter += 1
-                instance_list.append(aidraw_instance)
-
-        return instance_list
-
-    async def get_seaart_task(self):
-        instance_list = []
-        counter = 0
-        for i in self.config.seaart:
-            if i is not None:
-                aidraw_instance = AIDRAW7(count=counter, payload=self.payload)
-                counter += 1
-                instance_list.append(aidraw_instance)
-
-        return instance_list
-
-    async def get_yunjie_task(self):
-        instance_list = []
-        counter = 0
-        for i in self.config.yunjie:
-            if i is not None:
-                aidraw_instance = AIDRAW8(count=counter, payload=self.payload)
-                counter += 1
-                instance_list.append(aidraw_instance)
-
-        return instance_list
-
-    async def get_comfyui_task(self):
-
-        instance_list = []
-        counter = 0
-
-        hr_mode = self.payload.get('enable_hr', None)
-
-        for i in self.config.comfyui['name']:
-
-            try:
-                selected_task = (
-                "sdbase_txt2img_hr_fix" if hr_mode
-                else self.config.comfyui.get('default_workflows', ['sdbase_txt2img'])[counter]
+                create_and_append_instances(
+                    enable_backend,
+                    AIDRAW,
+                    backend_setting,
+                    self.payload,
+                    instance_list,
+                    extra_args={"request": self.request, "path": self.path}
                 )
-            except IndexError:
-                selected_task = "sdbase_txt2img"
 
-            img2img = self.payload.get("init_images", [])
-            if img2img:
-                selected_task = "sdbase_img2img"
+            elif "fal_ai" in enable_backend:
+                from FLUX_falai import AIDRAW
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
 
-            aidraw_instance = AIDRAW9(
-                count=counter,
-                payload=self.payload,
-                request=self.request,
-                path=self.path,
-                comfyui_api_json=self.comfyui_task or selected_task
-            )
-            counter += 1
-            instance_list.append(aidraw_instance)
+            elif "replicate" in enable_backend:
+                from FLUX_replicate import AIDRAW
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
 
-        return instance_list
+            elif "liblibai" in enable_backend:
+                from liblibai import AIDRAW
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
 
-    async def get_novelai_task(self):
+            elif "tusiart" in enable_backend:
+                from .tusiart import AIDRAW
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
 
-        instance_list = []
-        counter = 0
-        for i in self.config.novelai:
-            aidraw_instance = AIDRAW10(
-                count=counter,
-                payload=self.payload
-            )
-            counter += 1
-            instance_list.append(aidraw_instance)
+            elif "seaart" in enable_backend:
+                from .seaart import AIDRAW
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
 
-        return instance_list
+            elif "yunjie" in enable_backend:
+                from .yunjie import AIDRAW
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
 
-    async def get_midjourney_task(self):
+            elif "comfyui" in enable_backend:
+                from .comfyui import AIDRAW
 
-        instance_list = []
-        counter = 0
+                create_and_append_instances(
+                    enable_backend,
+                    AIDRAW,
+                    backend_setting,
+                    self.payload,
+                    instance_list,
+                    extra_args={
+                        "request": self.request,
+                        "path": self.path
+                    }
+                )
 
-        for i in self.config.midjourney['name']:
+            elif "novelai" in enable_backend:
+                from .novelai import AIDRAW
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
 
-            aidraw_instance = AIDRAW11(
-                count=counter,
-                payload=self.payload
-            )
-            counter += 1
-            instance_list.append(aidraw_instance)
+            elif "midjourney" in enable_backend:
+                from .midjourney import AIDRAW
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
 
-        return instance_list
+        self.instance_list = instance_list
 
 
 class TXT2IMGHandler(BaseHandler):
@@ -247,15 +161,8 @@ class TXT2IMGHandler(BaseHandler):
         super().__init__(comfyui_task=comfyui_task, payload=payload)
 
     async def get_all_instance(self) -> tuple[list[Backend], dict]:
-        # 手动选择启动的后端
-        man_enable_task = self.config.server_settings['enable_txt2img_backends']
-        if len(man_enable_task) != 0:
-            man_enable_task = man_enable_task
-        else:
-            man_enable_task = self.all_task_list
 
-        await self.get_enable_task(man_enable_task)
-
+        await self.get_enable_task("enable_txt2img_backends")
         return self.instance_list, self.enable_backend
 
 
@@ -265,15 +172,8 @@ class IMG2IMGHandler(BaseHandler):
         super().__init__(comfyui_task=comfyui_task, payload=payload)
 
     async def get_all_instance(self) -> tuple[list[Backend], dict]:
-        # 手动选择启动的后端
-        man_enable_task = self.config.server_settings['enable_img2img_backends']
-        if len(man_enable_task) != 0:
-            man_enable_task = man_enable_task
-        else:
-            man_enable_task = self.all_task_list
 
-        await self.get_enable_task(man_enable_task)
-
+        await self.get_enable_task("enable_img2img_backends")
         return self.instance_list, self.enable_backend
 
 
@@ -281,32 +181,22 @@ class A1111WebuiHandler(BaseHandler):
 
     async def get_all_instance(self) -> tuple[list[Backend], dict]:
 
-        await self.get_enable_task([1])
-
+        await self.get_enable_task("enable_a1111_backend")
         return self.instance_list, self.enable_backend
 
 
 class A1111WebuiHandlerAPI(BaseHandler):
     async def get_all_instance(self) -> tuple[list[Backend], dict]:
 
-        man_enable_task = self.config.server_settings['enable_sdapi_backends']
-        if len(man_enable_task) != 0:
-            man_enable_task = man_enable_task
-        else:
-            man_enable_task = self.all_task_list
-
-        await self.get_enable_task(man_enable_task)
-
+        await self.get_enable_task("enable_sdapi_backends")
         return self.instance_list, self.enable_backend
 
-#
-# class ComfyuiHandler(BaseHandler):
-#
-#     async def get_all_instance(self) -> tuple[list[Backend], dict]:
-#
-#         await self.get_enable_task([1])
-#
-#         return self.instance_list, self.enable_backend
+
+class ComfyUIHandler(BaseHandler):
+
+    async def get_all_instance(self) -> tuple[list[Backend], dict]:
+        await self.get_enable_task("comfyui")
+        return self.instance_list, self.enable_backend
 
 
 class StaticHandler:
@@ -747,6 +637,16 @@ class TaskHandler(StaticHandler):
         await self.choice_backend()
         return self.result
 
+    async def comfyui_api(self) -> JSONResponse or list[Backend]:
+
+        self.instance_list, self.enable_backend = await ComfyUIHandler(
+            self.payload,
+            self.request,
+            self.path
+        ).get_all_instance()
+
+        await self.choice_backend()
+        return self.result
 
     async def choice_backend(self):
 
@@ -765,7 +665,7 @@ class TaskHandler(StaticHandler):
         ava_url = None
         n = -1
         e = -1
-        normal_backend = None
+        normal_backend = []
         idle_backend = []
 
         logger = setup_logger(custom_prefix='[LOAD_BALANCE]')

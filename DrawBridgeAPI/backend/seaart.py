@@ -7,17 +7,10 @@ from .base import Backend
 
 class AIDRAW(Backend):
 
-    def __init__(self, count, payload, **kwargs):
-        super().__init__(count=count, payload=payload, **kwargs)
-        # 需要更改
-        self.model = f"SeaArt - {self.config.seaart_setting['model'][self.count]}"
-        self.model_hash = "c7352c5d2f"
-        self.logger = self.setup_logger('[SeaArt]')
-        token = self.config.seaart[self.count]
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
-        self.token = token
-        self.backend_name = self.config.backend_name_list[6]
-        self.workload_name = f"{self.backend_name}-{token}"
+        self.logger = self.setup_logger('[SeaArt]')
 
     async def heart_beat(self, id_):
         self.logger.info(f"{id_} 开始请求")
@@ -76,13 +69,13 @@ class AIDRAW(Backend):
 
         input_ = {
             "action": 1,
-            "art_model_no": "1a486c58c2aa0601b57ddc263fc350d0",
+            "art_model_no": self.model_path or "1a486c58c2aa0601b57ddc263fc350d0",
             "category": 1,
             "speed_type": 1,
             "meta":
                 {
-                    "prompt": self.tags,
-                    "negative_prompt": self.ntags,
+                    "prompt": self.prompt,
+                    "negative_prompt": self.negative_prompt,
                     "restore_faces": self.restore_faces,
                     "seed": self.seed,
                     "sampler_name": self.sampler,
@@ -113,7 +106,7 @@ class AIDRAW(Backend):
 
         new_headers = {
             "Accept": "application/json, text/plain, */*",
-            "Token": self.token
+            "Token": self.backend_id
         }
 
         self.headers.update(new_headers)

@@ -7,17 +7,10 @@ from .base import Backend
 
 class AIDRAW(Backend):
 
-    def __init__(self, count, payload, **kwargs):
-        super().__init__(count=count, payload=payload, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
-        self.model = f"TusiArt - tusiart.com/models/{self.config.tusiart_setting['model'][self.count]}"
-        self.model_hash = "c7352c5d2f"
         self.logger = self.setup_logger('[TusiArt]')
-
-        token = self.config.tusiart[self.count]
-        self.token = token
-        self.backend_name = self.config.backend_name_list[5]
-        self.workload_name = f"{self.backend_name}-{token}"
 
     async def heart_beat(self, id_):
         self.logger.info(f"{id_}开始请求")
@@ -89,7 +82,7 @@ class AIDRAW(Backend):
                 {
                     "baseModel":
                      {
-                         "modelId": self.config.tusiart_setting['model'][self.count],
+                         "modelId": self.model_path or "758751795863586176",
                          "modelFileId": "708770380970509676"
                      },
                     "sdxl":
@@ -97,8 +90,8 @@ class AIDRAW(Backend):
                     "models": [],
                     "embeddingModels": [],
                     "sdVae": "Automatic",
-                    "prompt": self.tags,
-                    "negativePrompt": self.ntags,
+                    "prompt": self.prompt,
+                    "negativePrompt": self.negative_prompt,
                     "height": self.height,
                     "width": self.width,
                     "imageCount": self.total_img_count,
@@ -130,9 +123,9 @@ class AIDRAW(Backend):
             input_['params'].update(hr_payload)
 
         new_headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Token": self.token,
-            "referer": self.config.tusiart_setting['referer'][self.count],
+            "Authorization": f"Bearer {self.backend_id}",
+            "Token": self.backend_id,
+            "referer": self.config.backends[self.backend_type]['referer'][self.count],
             "sec-ch-ua": 'Not)A;Brand";v="99", "Microsoft Edge";v="127", "Chromium";v="127'
         }
         self.headers.update(new_headers)

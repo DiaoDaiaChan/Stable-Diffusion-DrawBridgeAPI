@@ -9,17 +9,10 @@ from .base import Backend
 
 class AIDRAW(Backend):
 
-    def __init__(self, count, payload, **kwargs):
-        super().__init__(count=count, payload=payload, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
-        self.model = "Fal-AI - FLUX.1 [schnell]"
-        self.model_hash = "c7352c5d2f"
         self.logger = self.setup_logger('[FLUX-FalAI]')
-
-        token = self.config.fal_ai[self.count]
-        self.token = token
-        self.backend_name = self.config.backend_name_list[2]
-        self.workload_name = f"{self.backend_name}-{token}"
 
     async def get_shape(self):
 
@@ -68,14 +61,14 @@ class AIDRAW(Backend):
 
     async def posting(self):
 
-        os.environ['FAL_KEY'] = self.token
+        os.environ['FAL_KEY'] = self.backend_id
         image_shape = await self.get_shape()
         self.steps = int(self.steps / 3)
 
         handler = await fal_client.submit_async(
             "fal-ai/flux/schnell",
             arguments={
-                "prompt": self.tags,
+                "prompt": self.prompt,
                 "image_size": image_shape,
                 "seed": self.seed,
                 "num_inference_steps": self.steps,  # FLUX不需要很高的步数

@@ -7,17 +7,10 @@ from .base import Backend
 
 class AIDRAW(Backend):
 
-    def __init__(self, count, payload, **kwargs):
-        super().__init__(count=count, payload=payload, **kwargs)
-        # 需要更改
-        self.model = f"YunJie - {self.config.yunjie_setting['model'][self.count]}"
-        self.model_hash = "c7352c5d2f"
-        self.logger = self.setup_logger('[YunJie]')
-        token = self.config.yunjie[self.count]
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
-        self.token = token
-        self.backend_name = self.config.backend_name_list[7]
-        self.workload_name = f"{self.backend_name}-{token}"
+        self.logger = self.setup_logger('[YunJie]')
 
     async def heart_beat(self, id_):
         self.logger.info(f"{id_} 开始请求")
@@ -79,7 +72,7 @@ class AIDRAW(Backend):
         input_ = {
             "genModel": "advance",
             "initImage": "",
-            "modelUuid": "MGC-17d172ee37c1b000",
+            "modelUuid": self.model_path or "MGC-17d172ee37c1b000",
             "samplingMethod":
                 self.sampler,
             "cfgScale": self.scale,
@@ -87,13 +80,13 @@ class AIDRAW(Backend):
             "plugins": [],
             "clipSkip": 2,
             "etaNoiseSeedDelta": 31337,
-            "prompt": self.tags,
-            "negativePrompt": self.ntags,
+            "prompt": self.prompt,
+            "negativePrompt": self.negative_prompt,
             "resolutionX": self.width,
             "resolutionY": self.height,
             "genCount": self.total_img_count,
             "seed": self.seed,
-            "tags": []
+            "prompt": []
         }
 
         if self.enable_hr:
@@ -110,12 +103,11 @@ class AIDRAW(Backend):
             input_.update(hr_payload)
 
         new_headers = {
-            "Token": self.token
+            "Token": self.backend_id
         }
         self.headers.update(new_headers)
         data = json.dumps(input_)
 
-        # 使用 http_request 函数发送 POST 请求
         response = await self.http_request(
             method="POST",
             target_url="https://www.yunjie.art/rayvision/aigc/customer/task/imageGen",

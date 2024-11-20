@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import Union
 
 from ..base_config import setup_logger
-from ..base_config import init_instance
+from ..base_config import init_instance, Config
 from ..utils import exceptions
 from ..locales import _
 
@@ -33,6 +33,7 @@ class Backend:
     locks = {}
     task_count = 0
     queue_logger = setup_logger('[QueueManager]')
+    config: Config = init_instance.config  # 配置文件
 
     @classmethod
     def get_queue(cls, token):
@@ -94,14 +95,15 @@ class Backend:
         input_img: str = None,
         request: Request = None,
         path: str = None,
-        comfyui_api_json: str = None,
+        enable_queue: bool = False,
+        model_path: str = None,
+        backend_type: str = None,
         **kwargs,
     ):
 
-
-        self.tags: str = payload.get('prompt', '1girl')
-        self.ntags: str = payload.get('negative_prompt', '')
-        self.seed: int = payload.get('seed', random.randint(0, 4294967295))
+        self.prompt: str = payload.get('prompt', '1girl')
+        self.negative_prompt: str = payload.get('negative_prompt', '')
+        self.seed: int = payload.get('seed', random.randint(0, 2 ** 32))
         self.seed_list: list[int] = [self.seed]
         self.steps: int = payload.get('steps', 20)
         self.scale: float = payload.get('cfg_scale', 7.0)
@@ -135,30 +137,25 @@ class Backend:
         self.clip_skip = 2
         self.final_width = None
         self.final_height = None
-        self.model = "DiaoDaia"
-        self.model_id = '20204'
+        self.model = "DiaoDaia"  # 模型名称
         self.model_hash = "c7352c5d2f"
         self.model_list: list = []
-        self.model_path = "models\\1053-S.ckpt"
+        self.model_path = model_path  # 模型的路径(选择模型使用这个变量)
         self.client_id = uuid.uuid4().hex
-
-        self.comfyui_api_json = comfyui_api_json
-        self.comfyui_api_json_reflex = None
 
         self.result: list = []
         self.time = time.strftime("%Y-%m-%d %H:%M:%S")
 
-        self.backend_url = backend_url  # 后端url
-        self.backend_id = None  # 用于区别后端, token或者ulr
+        self.backend_type = backend_type  # 后端类型
+        self.backend_name = ''  # 后端名称
+        self.workload_name = ''  # 后端类型-后端名称
+        self.backend_id = ""  # token或者后端地址
         self.headers = {
             "Content-Type": "application/json",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0",
         }  # 后端headers
         self.login = login  # 是否需要登录后端
-        self.token = token  # 后端token
         self.count = count  # 适用于后端的负载均衡中遍历的后端编号
-        self.config = init_instance.config  # 配置文件
-        self.backend_name = ''  # 后端名称
         self.current_config = None  # 当前后端的配置
 
         self.fail_on_login = None
@@ -182,7 +179,6 @@ class Backend:
         self.post_event = None
         self.task_id = uuid.uuid4().hex
         self.task_type = 'txt2img'
-        self.workload_name = None
         self.current_date = datetime.now().strftime('%Y%m%d')
         self.save_path = ''
 
@@ -201,14 +197,26 @@ class Backend:
 
         self.reflex_dict = {}
 
+        self.enable_queue = enable_queue
+
+        # 后端基础信息初始化
+
+    def init_backend_info(self):
+        self.backend_name = self.config.backends[self.backend_type]["name"][self.count]
+        self.workload_name = f"{self.backend_type}-{self.backend_name}"
+
+        self.current_config: dict = self.config.backends[self.backend_type]
+        self.model = f"{self.backend_type} - {self.backend_name} - {self.model}"
+        self.backend_id = self.current_config['api'][self.count]
+
     def format_api_respond(self):
 
         self.build_info = {
-            "prompt": self.tags,
-            "all_prompts": self.repeat(self.tags)
+            "prompt": self.prompt,
+            "all_prompts": self.repeat(self.prompt)
         ,
-            "negative_prompt": self.ntags,
-            "all_negative_prompts": self.repeat(self.ntags)
+            "negative_prompt": self.negative_prompt,
+            "all_negative_prompts": self.repeat(self.negative_prompt)
         ,
             "seed": self.seed_list,
             "all_seeds": self.seed_list,
@@ -235,7 +243,7 @@ class Backend:
             },
             "index_of_first_image": 0,
             "infotexts": self.repeat(
-                f"{self.tags}\\nNegative prompt: {self.ntags}\\nSteps: {self.steps}, Sampler: {self.sampler}, CFG scale: {self.scale}, Seed: {self.seed_list}, Size: {self.final_width}x{self.final_height}, Model hash: c7352c5d2f, Model: {self.model}, Denoising strength: {self.denoising_strength}, Clip skip: {self.clip_skip}, Version: 1.1.4"
+                f"{self.prompt}\\nNegative prompt: {self.negative_prompt}\\nSteps: {self.steps}, Sampler: {self.sampler}, CFG scale: {self.scale}, Seed: {self.seed_list}, Size: {self.final_width}x{self.final_height}, Model hash: c7352c5d2f, Model: {self.model}, Denoising strength: {self.denoising_strength}, Clip skip: {self.clip_skip}, Version: 1.1.4"
             )
         ,
             "styles": [
@@ -251,8 +259,8 @@ class Backend:
             "videos": [],
             "images_url": self.img_url,
             "parameters": {
-                "prompt": self.tags,
-                "negative_prompt": self.ntags,
+                "prompt": self.prompt,
+                "negative_prompt": self.negative_prompt,
                 "seed": self.seed_list,
                 "subseed": -1,
                 "subseed_strength": 0,
@@ -545,7 +553,7 @@ class Backend:
                 )
                 # 如果传入了Request对象/转发请求
                 if self.request:
-                    target_url = f"{self.backend_url}/{self.path}"
+                    target_url = f"{self.backend_id}/{self.path}"
 
                     self.logger.info(f"{_('Forwarding request')} - {target_url}")
 
@@ -564,16 +572,20 @@ class Backend:
 
                     self.result = JSONResponse(content=resp, status_code=response.status_code)
                 else:
+                    if not self.enable_queue:
+                        self.logger.info(_('Backend not using built-in multi-image generation management'))
+                        if "a1111" in self.backend_type:
+                            await self.posting()
 
-                    if "comfyui" in self.backend_name:
-                        await self.add_to_queue(self.backend_id[:24], self.posting)
-                        self.logger.info(_('Comfyui Backend, not using built-in multi-image generation management'))
-                    elif "a1111" in self.backend_name:
-                        await self.add_to_queue(self.backend_id[:24], self.posting)
-                        self.logger.info(_('A1111 Backend, not using built-in multi-image generation management'))
+                        else:
+                            for i in range(self.batch_count):
+                                await self.posting()
+                                self.seed += 1
+                                self.seed_list.append(self.seed)
+
                     else:
                         self.logger.info(f"{self.backend_name}: {self.backend_id[:24]} total {self.total_img_count} images")
-                        for i in range(self.total_img_count):
+                        for i in range(self.batch_count):
                             if i > 0:
                                 self.seed += 1
                                 self.seed_list.append(self.seed)
@@ -610,9 +622,9 @@ class Backend:
 
     async def post_request(self):
         try:
-            post_api = f"{self.backend_url}/sdapi/v1/txt2img"
+            post_api = f"{self.backend_id}/sdapi/v1/txt2img"
             if self.init_images:
-                post_api = f"{self.backend_url}/sdapi/v1/img2img"
+                post_api = f"{self.backend_id}/sdapi/v1/img2img"
 
             response = await self.http_request(
                 method="POST",
@@ -630,7 +642,7 @@ class Backend:
                     self.logger.error(resp_dict)
                     if resp_dict.get("error") == "OutOfMemoryError":
                         self.logger.info(_("VRAM OOM detected, auto model unload and reload"))
-                        await self.unload_and_reload(self.backend_url)
+                        await self.unload_and_reload(self.backend_id)
                 else:
                     self.result = resp_dict
                     self.logger.info(_("Get a respond image, processing"))
@@ -763,7 +775,7 @@ class Backend:
         try:
             response = await self.http_request(
                 method="GET",
-                target_url=f"{self.backend_url}/sdapi/v1/progress",
+                target_url=f"{self.backend_id}/sdapi/v1/progress",
                 headers=None
             )
 
@@ -816,7 +828,7 @@ class Backend:
 
     async def get_models(self) -> dict:
 
-        if self.backend_name != self.config.backend_name_list[1]:
+        if self.backend_type != "a1111webui":
             respond = self.format_models_resp()
 
             backend_to_models_dict = {
@@ -827,11 +839,11 @@ class Backend:
 
         else:
 
-            self.backend_url = self.config.a1111webui_setting['backend_url'][self.count]
+            self.backend_url = self.config.backends["a1111webui"]['api'][self.count]
             try:
                 respond = await self.http_request(
                     "GET",
-                    f"{self.backend_url}/sdapi/v1/sd-models",
+                    f"{self.backend_id}/sdapi/v1/sd-models",
                 )
             except Exception:
                 self.logger.warning(f"获取模型失败")
@@ -845,7 +857,7 @@ class Backend:
 
     async def get_all_prompt_style(self) -> list:
 
-        if self.backend_name == "comfyui":
+        if self.backend_type == "comfyui":
 
             work_flows = []
             resp_dict = {}
@@ -863,10 +875,10 @@ class Backend:
             resp = []
 
             try:
-                self.backend_url = self.config.a1111webui_setting['backend_url'][self.count]
+                self.backend_url = self.config.backends["a1111webui"]['api'][self.count]
                 respond = await self.http_request(
                     "GET",
-                    f"{self.backend_url}/sdapi/v1/prompt-styles",
+                    f"{self.backend_id}/sdapi/v1/prompt-styles",
                     format=True
                 )
                 if respond.get('error', None):
@@ -883,7 +895,7 @@ class Backend:
         from ..utils.tagger import wd_tagger_handler
         new_image_list = []
         for i in self.result['images']:
-            is_nsfw = await wd_tagger_handler.tagger_main(i, 0.35, [], True)
+            is_nsfw = await wd_tagger_handler.tagger_main(i, 0.35, [], audit=True, ratings_=False)
 
             if is_nsfw:
                 img_base64 = await self.return_build_image()
@@ -905,15 +917,12 @@ class Backend:
             draw.pieslice([x0, y1 - 2 * radius, x0 + 2 * radius, y1], 90, 180, fill=fill)  # 左下圆角
             draw.pieslice([x1 - 2 * radius, y1 - 2 * radius, x1, y1], 0, 90, fill=fill)  # 右下圆角
 
-        # 创建一个新的图像
         img = Image.new("RGB", (512, 512), color=(255, 255, 255))
         draw = ImageDraw.Draw(img)
 
-        # 设置字体大小
         title_font_size = 24
         text_font_size = 16
 
-        # 加载默认字体
         title_font = ImageFont.load_default()
         text_font = ImageFont.load_default()
 
@@ -922,7 +931,6 @@ class Backend:
         title_y = 20  # 设置标题的纵坐标
         title_bbox = draw.textbbox((0, 0), title, font=title_font)
 
-        # 绘制以标题为边界的背景
         draw_rounded_rectangle(draw,
                                (title_x - 10, title_y - 10, title_x + title_bbox[2] + 10, title_y + title_bbox[3] + 10),
                                radius=10, fill=(0, 0, 0))
@@ -930,7 +938,6 @@ class Backend:
         # 绘制标题
         draw.text((title_x, title_y), title, fill=(255, 255, 255), font=title_font)  # 白色标题
 
-        # 准备绘制文本，设置最大宽度
         max_text_width = img.width - 40
         wrapped_text = []
         words = text.split(' ')
@@ -945,37 +952,30 @@ class Backend:
                 wrapped_text.append(current_line)
                 current_line = word
 
-        wrapped_text.append(current_line)  # 添加最后一行
+        wrapped_text.append(current_line)
 
-        # 绘制内容文字
-        text_y = title_y + 40  # 让内容文字与标题有间距
+        text_y = title_y + 40
         for line in wrapped_text:
-            text_x = 20  # 左对齐，设置内容文字的横坐标
+            text_x = 20
 
-            # 绘制内容文字背景
             text_bbox = draw.textbbox((0, 0), line, font=text_font)
             draw_rounded_rectangle(draw,
                                    (text_x - 10, text_y - 5, text_x + text_bbox[2] + 10, text_y + text_bbox[3] + 5),
                                    radius=10, fill=(0, 0, 0))
 
-            # 绘制内容文字
             draw.text((text_x, text_y), line, fill=(255, 255, 255), font=text_font)  # 白色内容文字
             text_y += text_bbox[3] - text_bbox[1] + 5  # 行间距
 
-        # 将图像保存到内存字节流中
         img_byte_array = BytesIO()
         img.save(img_byte_array, format='PNG')
         img_byte_array.seek(0)
 
-        # 编码为base64
         base64_image = base64.b64encode(img_byte_array.getvalue()).decode('utf-8')
         self.img_btyes.append(img_byte_array.getvalue())
         self.img.append(base64_image)
 
         return base64_image
 
-    def get_backend_id(self):
-        self.backend_id = self.token or self.backend_url
 
     async def err_formating_to_sd_style(self):
 

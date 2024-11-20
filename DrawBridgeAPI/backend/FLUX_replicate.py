@@ -10,17 +10,9 @@ from .base import Backend
 
 class AIDRAW(Backend):
 
-    def __init__(self, count, payload, **kwargs):
-        super().__init__(count=count, payload=payload, **kwargs)
-
-        self.model = "Replicate - FLUX.1 [schnell]"
-        self.model_hash = "c7352c5d2f"
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.logger = self.setup_logger('[FLUX-Replicate]')
-
-        token = self.config.replicate[self.count]
-        self.token = token
-        self.backend_name = self.config.backend_name_list[3]
-        self.workload_name = f"{self.backend_name}-{token}"
 
     async def get_shape(self):
 
@@ -81,11 +73,11 @@ class AIDRAW(Backend):
 
     async def posting(self):
 
-        os.environ['REPLICATE_API_TOKEN'] = self.token
+        os.environ['REPLICATE_API_TOKEN'] = self.backend_id
         image_shape = await self.get_shape()
 
         input_ = {
-            "prompt": self.tags,
+            "prompt": self.prompt,
             "seed": self.seed,
             "num_outputs": self.total_img_count,
             "aspect_ratio": image_shape,

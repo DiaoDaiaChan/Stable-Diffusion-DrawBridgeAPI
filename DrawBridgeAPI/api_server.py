@@ -146,19 +146,19 @@ class Api:
         selected_style = []
         selected_comfyui_style = []
 
-        logger.error(styles)
-
         if styles:
             api_styles = StaticHandler.get_prompt_style()
-
             for index, i in enumerate(api_styles):
                 for style in styles:
-                    if style in i['name']:
-                        if 'comfyui' in i['name']:
-                            logger.info(f"{_('Selected ComfyUI style')} - {i['name']}")
-                            selected_comfyui_style.append(i['name'])
-                        else:
-                            selected_style.append(i['name'])
+                    if style.strip() == '':
+                        pass
+                    else:
+                        if style in i['name']:
+                            if 'comfyui' in i['name']:
+                                logger.info(f"{_('Selected ComfyUI style')} - {i['name']}")
+                                selected_comfyui_style.append(i['name'])
+                            else:
+                                selected_style.append(i['name'])
 
         if selected_style:
             for i in selected_style:
