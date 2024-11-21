@@ -1,6 +1,9 @@
 msgid "Loading config file completed"
 msgstr "加载配置文件完成"
 
+msgid "API initialization completed"
+msgstr "API初始化完成"
+
 msgid "Redis connection successful"
 msgstr "Redis连接成功"
 
@@ -58,23 +61,23 @@ msgstr "已锁定后端"
 msgid "Starting backend selection"
 msgstr "开始进行后端选择"
 
-msgid "Backend %s is down"
-msgstr "后端%s掉线"
+msgid "Backend {0} is down"
+msgstr "后端 {0} 掉线"
 
-msgid "Backend %s is failed or locked"
-msgstr "后端%s出错或者锁定中"
+msgid "Backend {0} is failed or locked"
+msgstr "后端 {0} 出错或者锁定中"
 
 msgid "No available backend"
 msgstr "没有可用后端"
 
-msgid "Backend: %s Average work time: %s seconds, Current tasks: %s"
-msgstr "后端: %s 平均工作时间: %s秒, 现在进行中的任务: %s"
+msgid "Backend: {0} Average work time: {1} seconds, Current tasks: {2}"
+msgstr "后端: {0} 平均工作时间: {1}秒, 现在进行中的任务: {2}"
 
 msgid "Extra time weight"
 msgstr "额外的时间权重"
 
-msgid "Backend %s is the fastest, has been selected"
-msgstr "后端%s最快, 已经选择"
+msgid "Backend: {0} is the fastest, has been selected"
+msgstr "后端{0}最快, 已经选择"
 
 msgid "Task completed successfully"
 msgstr "任务成功完成"
@@ -94,8 +97,8 @@ msgstr "已转发请求"
 msgid "Backend returned error"
 msgstr "后端返回错误"
 
-msgid "Comfyui Backend, not using built-in multi-image generation management"
-msgstr "Comfyui后端, 不使用内置多图生成管理"
+msgid "Backend not using built-in multi-image generation management"
+msgstr "后端不使用内置多图生成管理"
 
 msgid "A1111 Backend, not using built-in multi-image generation management"
 msgstr "A1111后端, 不使用内置多图生成管理"
@@ -103,8 +106,8 @@ msgstr "A1111后端, 不使用内置多图生成管理"
 msgid "Over maximum retry times, posting still failed"
 msgstr "超过最大重试次数之后依然失败"
 
-msgid "Request completed, took %s seconds"
-msgstr "请求完成，共耗%s秒"
+msgid "Request completed, took {0} seconds"
+msgstr "请求完成, 花费{0}秒"
 
 msgid "VRAM OOM detected, auto model unload and reload"
 msgstr "检测到爆显存，执行自动模型释放并加载"
@@ -120,3 +123,18 @@ msgstr "图片下载成功"
 
 msgid "Selected ComfyUI style"
 msgstr "已选择ComfyUI工作流"
+
+msgid "Working directory: {0}"
+msgstr "工作目录：{0}"
+
+msgid "Starting image audit"
+msgstr "开始图片审核"
+
+msgid "NSFW Detected"
+msgstr "检测到不合适图片"
+
+msgid "Image safe"
+msgstr "图片安全"
+
+msgid "Backend {0} is enabled"
+msgstr "后端 {0} 已启用"

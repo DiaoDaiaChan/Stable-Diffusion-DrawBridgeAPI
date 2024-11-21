@@ -25,7 +25,7 @@ class AIDRAW(Backend):
         # 需要更改
         self.logger = self.setup_logger('[Comfyui]')
 
-        self.comfyui_api_json = "sdbase_txt2img"
+        self.comfyui_api_json = None
         self.comfyui_api_json_reflex = None
 
         self.reflex_dict['sampler'] = {
@@ -72,17 +72,6 @@ class AIDRAW(Backend):
 
         self.scheduler = self.reflex_dict['scheduler'].get(self.scheduler, "normal")
         self.sampler = self.reflex_dict['sampler'].get(self.sampler, "euler")
-
-        self.logger.info(f"选择工作流{self.comfyui_api_json}")
-        path_to_json = self.comfyui_api_json
-        if self.comfyui_api_json:
-
-            with open(
-                    Path(f"{os.path.dirname(os.path.abspath(__file__))}/../comfyui_workflows/{self.comfyui_api_json}.json").resolve(), 'r', encoding='utf-8') as f:
-                self.comfyui_api_json = json.load(f)
-            with open(
-                    Path(f"{os.path.dirname(os.path.abspath(__file__))}/../comfyui_workflows/{path_to_json}_reflex.json").resolve(), 'r', encoding='utf-8') as f:
-                self.comfyui_api_json_reflex = json.load(f)
 
     async def heart_beat(self, id_):
         self.logger.info(f"{id_} 开始请求")
@@ -189,6 +178,18 @@ class AIDRAW(Backend):
         self.result = self.build_respond
 
     async def posting(self):
+
+        self.logger.info(f"选择工作流{self.comfyui_api_json}")
+        path_to_json = self.comfyui_api_json
+        if self.comfyui_api_json:
+
+            with open(
+                    Path(f"{os.path.dirname(os.path.abspath(__file__))}/../comfyui_workflows/{self.comfyui_api_json}.json").resolve(), 'r', encoding='utf-8') as f:
+                self.comfyui_api_json = json.load(f)
+            with open(
+                    Path(f"{os.path.dirname(os.path.abspath(__file__))}/../comfyui_workflows/{path_to_json}_reflex.json").resolve(), 'r', encoding='utf-8') as f:
+                self.comfyui_api_json_reflex = json.load(f)
+
         upload_img_resp_list = []
 
         if self.init_images:

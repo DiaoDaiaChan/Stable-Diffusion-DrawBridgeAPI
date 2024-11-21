@@ -95,7 +95,7 @@ class AIDRAW(Backend):
 
         json_data = {
             "input": self.prompt,
-            "model": self.config.novelai_setting['model'][self.count],
+            "model": self.model_path,
             "parameters": parameters
         }
 

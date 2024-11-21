@@ -266,7 +266,7 @@ config = init_instance.config
 if config.server_settings['build_in_tagger']:
     wd_tagger_handler = WaifuDiffusionTaggerHandler(
         name='WaifuDiffusion',
-        repo_id='SmilingWolf/wd-v1-4-convnextv2-tagger-v2',
+        repo_id='SmilingWolf/wd-convnext-tagger-v3',
         revision='v2.0',
         model_path='model.onnx',
         tags_path='selected_tags.csv'

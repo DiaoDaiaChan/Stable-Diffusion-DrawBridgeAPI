@@ -2,6 +2,7 @@ import asyncio
 import random
 import json
 import time
+import traceback
 
 import aiofiles
 
@@ -17,9 +18,16 @@ init()
 from ..base_config import setup_logger, init_instance
 from .base import Backend
 
+import_logger = setup_logger('[IMPORT_BACKEND]')
+
 from DrawBridgeAPI.locales import _ as i18n
 
+
 class BaseHandler:
+    #
+    selected_instance_list: list[Backend] = []
+    init_parameters_list: list[dict] = []
+    enable_backend: dict = {}
 
     def __init__(
         self,
@@ -35,7 +43,6 @@ class BaseHandler:
         self.path = path
         self.config = init_instance.config
         self.all_task_list = None
-        self.enable_backend: dict = {}
         self.comfyui_task: str = comfyui_task
 
     async def get_enable_task(
@@ -47,9 +54,13 @@ class BaseHandler:
         :param enable_task:
         :return:
         """
-        enable_backend_list: dict[str, list[int]] = self.config.enable_backends.get(task_type, {})
 
-        instance_list = []
+        if self.selected_instance_list:
+
+            self.instance_list = self.selected_instance_list
+            return
+
+        enable_backend_list: dict[str, list[int]] = self.config.enable_backends.get(task_type, {})
 
         for enable_backend, backend_setting in enable_backend_list.items():
 
@@ -57,8 +68,6 @@ class BaseHandler:
                     enable_backend_type,
                     AIDRAW_class,
                     backend_setting,
-                    payload,
-                    instance_list,
                     extra_args: dict=None
             ):
 
@@ -73,12 +82,31 @@ class BaseHandler:
                         counter = int(list(counter.keys())[0])
                         enable_queue = True if operation == "queue" else False
 
+                    override = self.config.backends[enable_backend_type].get("override", None)
+                    try:
+                        if override is not None:
+                            override = override[counter]
+                        else:
+                            override = None
+                    except IndexError:
+                        override = None
+
+                    init_args = {
+                        "count": counter,
+                        "payload": self.payload,
+                        "enable_queue": enable_queue,
+                        "backend_type": enable_backend_type,
+                        "override_setting": override,
+
+                    }
+
+                    if extra_args:
+                        init_args.update(extra_args)
+
+                    self.init_parameters_list.append(init_args)
+
                     aidraw_instance = AIDRAW_class(
-                        count=counter,
-                        payload=payload,
-                        enable_queue=enable_queue,
-                        backend_type=enable_backend_type,
-                        **(extra_args if extra_args else {})
+                        **init_args
                     )
                     self.enable_backend.update(
                         {
@@ -87,116 +115,97 @@ class BaseHandler:
                         }
                     )
                     aidraw_instance.init_backend_info()
-                    instance_list.append(aidraw_instance)
+                    import_logger.info("Backend {0} is enabled".format(self.config.backends[enable_backend_type]['name'][counter]))
+
+                    self.selected_instance_list.append(aidraw_instance)
 
             if "civitai" in enable_backend:
                 from .SD_civitai_API import AIDRAW
-                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting)
 
             elif "a1111webui" in enable_backend:
                 from .SD_A1111_webui import AIDRAW
 
-                create_and_append_instances(
-                    enable_backend,
-                    AIDRAW,
-                    backend_setting,
-                    self.payload,
-                    instance_list,
-                    extra_args={"request": self.request, "path": self.path}
-                )
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting,
+                                            extra_args={"request": self.request, "path": self.path})
 
             elif "fal_ai" in enable_backend:
-                from FLUX_falai import AIDRAW
-                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
+                from .FLUX_falai import AIDRAW
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting)
 
             elif "replicate" in enable_backend:
-                from FLUX_replicate import AIDRAW
-                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
+                from .FLUX_replicate import AIDRAW
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting)
 
             elif "liblibai" in enable_backend:
-                from liblibai import AIDRAW
-                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
+                from .liblibai import AIDRAW
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting)
 
             elif "tusiart" in enable_backend:
                 from .tusiart import AIDRAW
-                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting)
 
             elif "seaart" in enable_backend:
                 from .seaart import AIDRAW
-                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting)
 
             elif "yunjie" in enable_backend:
                 from .yunjie import AIDRAW
-                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting)
 
             elif "comfyui" in enable_backend:
                 from .comfyui import AIDRAW
 
-                create_and_append_instances(
-                    enable_backend,
-                    AIDRAW,
-                    backend_setting,
-                    self.payload,
-                    instance_list,
-                    extra_args={
-                        "request": self.request,
-                        "path": self.path
-                    }
-                )
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting, extra_args={
+                    "request": self.request,
+                    "path": self.path
+                })
 
             elif "novelai" in enable_backend:
                 from .novelai import AIDRAW
-                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting)
 
             elif "midjourney" in enable_backend:
                 from .midjourney import AIDRAW
-                create_and_append_instances(enable_backend, AIDRAW, backend_setting, self.payload, instance_list)
+                create_and_append_instances(enable_backend, AIDRAW, backend_setting)
 
-        self.instance_list = instance_list
+        self.instance_list = self.selected_instance_list
 
 
 class TXT2IMGHandler(BaseHandler):
 
-    def __init__(self, payload=None, comfyui_task: str = None):
+    def __init__(self, payload, comfyui_task: str = None):
         super().__init__(comfyui_task=comfyui_task, payload=payload)
 
-    async def get_all_instance(self) -> tuple[list[Backend], dict]:
+    async def get_all_instance(self) -> tuple[list[Backend], dict, list]:
 
         await self.get_enable_task("enable_txt2img_backends")
-        return self.instance_list, self.enable_backend
+        return self.instance_list, self.enable_backend, self.init_parameters_list
 
 
 class IMG2IMGHandler(BaseHandler):
 
-    def __init__(self, payload=None, comfyui_task: str = None):
+    def __init__(self, payload, comfyui_task: str = None):
         super().__init__(comfyui_task=comfyui_task, payload=payload)
 
-    async def get_all_instance(self) -> tuple[list[Backend], dict]:
+    async def get_all_instance(self) -> tuple[list[Backend], dict, list]:
 
         await self.get_enable_task("enable_img2img_backends")
-        return self.instance_list, self.enable_backend
-
-
-class A1111WebuiHandler(BaseHandler):
-
-    async def get_all_instance(self) -> tuple[list[Backend], dict]:
-
-        await self.get_enable_task("enable_a1111_backend")
-        return self.instance_list, self.enable_backend
+        return self.instance_list, self.enable_backend, self.init_parameters_list
 
 
 class A1111WebuiHandlerAPI(BaseHandler):
-    async def get_all_instance(self) -> tuple[list[Backend], dict]:
+    async def get_all_instance(self) -> tuple[list[Backend], dict, list]:
 
         await self.get_enable_task("enable_sdapi_backends")
-        return self.instance_list, self.enable_backend
+        return self.instance_list, self.enable_backend, self.init_parameters_list
 
 
 class ComfyUIHandler(BaseHandler):
 
-    async def get_all_instance(self) -> tuple[list[Backend], dict]:
+    async def get_all_instance(self) -> tuple[list[Backend], dict, list]:
         await self.get_enable_task("comfyui")
-        return self.instance_list, self.enable_backend
+        return self.instance_list, self.enable_backend, self.init_parameters_list
 
 
 class StaticHandler:
@@ -573,6 +582,7 @@ class TaskHandler(StaticHandler):
     ):
         self.payload = payload
         self.instance_list = []
+        self.parameters_list = []
         self.result = None
         self.request = request
         self.path = path
@@ -608,7 +618,7 @@ class TaskHandler(StaticHandler):
 
     async def txt2img(self):
 
-        self.instance_list, self.enable_backend = await TXT2IMGHandler(
+        self.instance_list, self.enable_backend, self.parameters_list = await TXT2IMGHandler(
             self.payload,
             comfyui_task=self.comfyui_json
         ).get_all_instance()
@@ -618,7 +628,7 @@ class TaskHandler(StaticHandler):
 
     async def img2img(self):
 
-        self.instance_list, self.enable_backend = await IMG2IMGHandler(
+        self.instance_list, self.enable_backend, self.parameters_list = await IMG2IMGHandler(
             self.payload,
             comfyui_task=self.comfyui_json
         ).get_all_instance()
@@ -628,7 +638,7 @@ class TaskHandler(StaticHandler):
 
     async def sd_api(self) -> JSONResponse or list[Backend]:
 
-        self.instance_list, self.enable_backend = await A1111WebuiHandlerAPI(
+        self.instance_list, self.enable_backend, self.parameters_list = await A1111WebuiHandlerAPI(
             self.payload,
             self.request,
             self.path
@@ -639,7 +649,7 @@ class TaskHandler(StaticHandler):
 
     async def comfyui_api(self) -> JSONResponse or list[Backend]:
 
-        self.instance_list, self.enable_backend = await ComfyUIHandler(
+        self.instance_list, self.enable_backend, self.parameters_list = await ComfyUIHandler(
             self.payload,
             self.request,
             self.path
@@ -704,7 +714,7 @@ class TaskHandler(StaticHandler):
             for resp_tuple in all_resp:
                 e += 1
                 if isinstance(resp_tuple, None or Exception):
-                    logger.warning(i18n('Backend %s is down') % self.instance_list[e].workload_name[:24])
+                    logger.warning(i18n('Backend {0} is down').format(self.instance_list[e].workload_name))
                 else:
                     try:
                         if resp_tuple[3] in [200, 201]:
@@ -714,7 +724,7 @@ class TaskHandler(StaticHandler):
                         else:
                             raise RuntimeError
                     except RuntimeError or TypeError:
-                        logger.warning(i18n('Backend %s is failed or locked') % self.instance_list[e].workload_name[:24])
+                        logger.warning(i18n('Backend {0} is failed or locked').format(self.instance_list[e].workload_name))
                         continue
                     else:
                         # 更改判断逻辑
@@ -726,7 +736,7 @@ class TaskHandler(StaticHandler):
                     # 显示进度
                     total = 100
                     progress = int(resp_tuple[0]["progress"] * 100)
-                    show_str = f"{list(backend_url_dict.keys())[e][:24]}"
+                    show_str = f"{self.instance_list[e].workload_name}"
                     show_str = show_str.ljust(50, "-")
 
                     bar_format = f"{Fore.CYAN}[Progress] {{l_bar}}{{bar}}|{Style.RESET_ALL}"
@@ -749,7 +759,7 @@ class TaskHandler(StaticHandler):
 
             for (site, time_), (_, image_count) in zip(avg_time_dict.items(), backend_image.items()):
                 self.load_balance_logger.info(
-                    i18n('Backend: %s Average work time: %s seconds, Current tasks: %s') % (site, time_, image_count - 1)
+                    i18n('Backend: {0} Average work time: {1} seconds, Current tasks: {2}').format(site, time_, image_count - 1)
                 )
                 if site in normal_backend:
                     self.update_backend_status()
@@ -768,7 +778,7 @@ class TaskHandler(StaticHandler):
                     total_work_time = effective_time * int(image_count)
 
                     eta = eta if time_ else 0
-                    self.load_balance_logger.info(f"{i18n('Extra time weight')}{eta}")
+                    self.load_balance_logger.info(f"{i18n('Extra time weight')} {eta}")
 
                     backend_total_work_time[site] = total_work_time - eta if (total_work_time - eta) >= 0 else total_work_time
 
@@ -783,7 +793,7 @@ class TaskHandler(StaticHandler):
             sorted_list = sorted(total_time_dict)
             fastest_backend = sorted_list[0]
             ava_url = rev_dict[fastest_backend]
-            self.load_balance_logger.info(i18n('Backend %s is the fastest, has been selected') % ava_url[:24])
+            self.load_balance_logger.info(i18n('Backend: {0} is the fastest, has been selected').format(ava_url[:35]))
             ava_url_index = list(backend_url_dict.values()).index(ava_url)
 
             self.ava_backend_url = ava_url
@@ -796,14 +806,14 @@ class TaskHandler(StaticHandler):
         self.set_backend_image(self.total_images, self.ava_backend_url)
         fifo = None
         try:
-            fifo = await self.instance_list[self.ava_backend_index].send_result_to_api()
+            select_instance = self.instance_list[self.ava_backend_index]
+            self.parameters_list[self.ava_backend_index]['payload'] = self.payload
+            select_instance.__init__(**self.parameters_list[self.ava_backend_index])
+            select_instance.init_backend_info()
+            fifo = await select_instance.send_result_to_api()
         except:
-            pass
+            traceback.print_exc()
         finally:
             self.set_backend_image(-self.total_images, self.ava_backend_url)
             self.result = fifo.result if fifo is not None else None
             await self.set_backend_work_time(fifo.spend_time, self.ava_backend_url, fifo.total_img_count)
-
-
-
-

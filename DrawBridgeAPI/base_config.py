@@ -7,8 +7,10 @@ import os
 
 from pydantic import BaseModel
 from typing import Dict, List
-
 from pathlib import Path
+
+from .locales import _
+
 
 redis_client = None
 
@@ -162,7 +164,7 @@ class ConfigInit:
         with open(self.config_file_path, "r", encoding="utf-8") as f:
             yaml_config = yaml_.load(f, Loader=yaml_.FullLoader)
             config = Config(**yaml_config)
-            self.logger.info('Loading config file completed')
+            self.logger.info(_('Loading config file completed'))
 
             return config
 
@@ -210,7 +212,7 @@ _____                              ____           _       _                     
             db=db_index
         )
 
-        self.logger.info('Redis connection successful')
+        self.logger.info(_('Redis connection successful'))
 
         workload_json = json.dumps(config.workload_dict)
 

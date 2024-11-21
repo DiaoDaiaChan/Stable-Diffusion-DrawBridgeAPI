@@ -13,8 +13,8 @@ class Txt2ImgRequest(RequetModelClass):
     prompt: Optional[str] = ""
     negative_prompt: Optional[str] = ""
     styles: List[str] = []
-    seed: int = random.randint(0, 4294967295)
-    subseed: int = random.randint(0, 4294967295)
+    seed: int = -1
+    subseed: int = -1
     subseed_strength: float = 0
     seed_resize_from_h: int = -1
     seed_resize_from_w: int = -1
@@ -67,8 +67,8 @@ class Img2ImgRequest(RequetModelClass):
     prompt: Optional[str] = ""
     negative_prompt: Optional[str] = ""
     styles: List[str] = []
-    seed: int = random.randint(0, 4294967295)
-    subseed: int = random.randint(0, 4294967295)
+    seed: int = -1
+    subseed: int = -1
     subseed_strength: float = 0
     seed_resize_from_h: int = -1
     seed_resize_from_w: int = -1

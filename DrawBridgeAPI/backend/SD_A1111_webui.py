@@ -56,8 +56,6 @@ class AIDRAW(Backend):
             use_aiohttp=False
         )
 
-        print(respond)
-
         self.model = respond['sd_model_checkpoint']
         self.model_hash = respond
 

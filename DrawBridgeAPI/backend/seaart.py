@@ -1,6 +1,7 @@
 import asyncio
 import json
 import traceback
+from ..locales import _
 
 from .base import Backend
 
@@ -14,6 +15,7 @@ class AIDRAW(Backend):
 
     async def heart_beat(self, id_):
         self.logger.info(f"{id_} 开始请求")
+        self.logger.info(f"{_()}")
         data = json.dumps({"task_ids": [id_]})
         for i in range(60):
             response = await self.http_request(

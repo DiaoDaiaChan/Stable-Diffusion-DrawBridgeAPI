@@ -1,34 +1,34 @@
+import asyncio
+import base64
+import json
 import random
+import time
+import traceback
 import uuid
+from datetime import datetime
+from io import BytesIO
+from pathlib import Path
+from typing import Union
 
 import aiofiles
 import aiohttp
-import json
-import asyncio
-import traceback
-import time
 import httpx
-
-from tqdm import tqdm
+from PIL import Image, ImageDraw, ImageFont
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from pathlib import Path
-from datetime import datetime
-from typing import Union
+from tqdm import tqdm
+from colorama import Fore, Style
+from colorama import init
+init()
 
-from ..base_config import setup_logger
 from ..base_config import init_instance, Config
-from ..utils import exceptions
+from ..base_config import setup_logger
 from ..locales import _
-
-import base64
-from io import BytesIO
-from PIL import Image, ImageDraw, ImageFont
+from ..utils import exceptions
 from ..utils.shared import PATH_TO_COMFYUI_WORKFLOWS
 
 
 class Backend:
-
     queues = {}
     locks = {}
     task_count = 0
@@ -57,7 +57,7 @@ class Backend:
         lock = cls.get_lock(token)
 
         if not lock.locked():
-            asyncio.create_task(cls.process_queue(token))
+            await asyncio.create_task(cls.process_queue(token))
 
         return await future
 
@@ -86,24 +86,26 @@ class Backend:
             cls.queue_logger.info(f"Token: {token}, {_('No remaining tasks in the queue')}")
 
     def __init__(
-        self,
-        login: bool = False,
-        backend_url: str = None,
-        token: str = "",
-        count: int = None,
-        payload: dict = {},
-        input_img: str = None,
-        request: Request = None,
-        path: str = None,
-        enable_queue: bool = False,
-        model_path: str = None,
-        backend_type: str = None,
-        **kwargs,
+            self,
+            login: bool = False,
+            backend_url: str = None,
+            token: str = "",
+            count: int = None,
+            payload: dict = {},
+            input_img: str = None,
+            request: Request = None,
+            path: str = None,
+            enable_queue: bool = False,
+            model_path: str = None,
+            backend_type: str = None,
+            override_setting: dict = None,
+            **kwargs,
     ):
 
         self.prompt: str = payload.get('prompt', '1girl')
         self.negative_prompt: str = payload.get('negative_prompt', '')
-        self.seed: int = payload.get('seed', random.randint(0, 2 ** 32))
+        seed = payload.get('seed', -1)
+        self.seed: int = random.randint(0, 2 ** 32) if seed == -1 else seed
         self.seed_list: list[int] = [self.seed]
         self.steps: int = payload.get('steps', 20)
         self.scale: float = payload.get('cfg_scale', 7.0)
@@ -114,8 +116,8 @@ class Backend:
         self.scheduler: str = payload.get('scheduler', 'Normal')
 
         self.batch_size: int = payload.get('batch_size', 1)
-        self.batch_count: int = payload.get('n_iter', 1)
-        self.total_img_count: int = self.batch_size * self.batch_count
+        self.n_iter: int = payload.get('n_iter', 1)
+        self.total_img_count: int = self.batch_size * self.n_iter
 
         self.enable_hr: bool = payload.get('enable_hr', False)
         self.hr_scale: float = payload.get('hr_scale', 1.5)
@@ -199,25 +201,49 @@ class Backend:
 
         self.enable_queue = enable_queue
 
-        # 后端基础信息初始化
+        self.override_setting = override_setting
 
     def init_backend_info(self):
+
+        self.override_backend_setting_func()
+
         self.backend_name = self.config.backends[self.backend_type]["name"][self.count]
         self.workload_name = f"{self.backend_type}-{self.backend_name}"
-
         self.current_config: dict = self.config.backends[self.backend_type]
-        self.model = f"{self.backend_type} - {self.backend_name} - {self.model}"
+
         self.backend_id = self.current_config['api'][self.count]
+        self.model = f"{self.backend_type} - {self.backend_name} - {self.model}"
+
+    def override_backend_setting_func(self):
+        """
+        覆写后端设置
+        """""
+        if self.override_setting:
+
+            for key, arg_value in self.override_setting.items():
+
+                if hasattr(self, key):
+
+                    if arg_value is not None:
+                        if key == 'negative_prompt':
+                            self.negative_prompt += arg_value
+                        elif key == 'prompt':
+                            self.prompt += arg_value
+                        else:
+                            setattr(self, key, arg_value)
+
+        else:
+            return
 
     def format_api_respond(self):
 
         self.build_info = {
             "prompt": self.prompt,
             "all_prompts": self.repeat(self.prompt)
-        ,
+            ,
             "negative_prompt": self.negative_prompt,
             "all_negative_prompts": self.repeat(self.negative_prompt)
-        ,
+            ,
             "seed": self.seed_list,
             "all_seeds": self.seed_list,
             "subseed": self.seed,
@@ -245,7 +271,7 @@ class Backend:
             "infotexts": self.repeat(
                 f"{self.prompt}\\nNegative prompt: {self.negative_prompt}\\nSteps: {self.steps}, Sampler: {self.sampler}, CFG scale: {self.scale}, Seed: {self.seed_list}, Size: {self.final_width}x{self.final_height}, Model hash: c7352c5d2f, Model: {self.model}, Denoising strength: {self.denoising_strength}, Clip skip: {self.clip_skip}, Version: 1.1.4"
             )
-        ,
+            ,
             "styles": [
 
             ],
@@ -343,7 +369,7 @@ class Backend:
         """
         if "view?filename=" in str(save_path):
             save_path = Path(str(save_path).replace("view?filename=", ""))
-        async with aiofiles.open(save_path, 'wb') as img_file:
+        async with aiofiles.open(f"{save_path}.png", 'wb') as img_file:
             await img_file.write(img_data)
 
     @staticmethod
@@ -381,38 +407,38 @@ class Backend:
     def format_vram_api_resp():
 
         build_resp = {
-          "ram": {
-            "free": 61582063428.50122,
-            "used": 2704183296,
-            "total": 64286246724.50122
-          },
-          "cuda": {
-            "system": {
-              "free": 4281335808,
-              "used": 2160787456,
-              "total": 85899345920
+            "ram": {
+                "free": 61582063428.50122,
+                "used": 2704183296,
+                "total": 64286246724.50122
             },
-            "active": {
-              "current": 699560960,
-              "peak": 3680867328
-            },
-            "allocated": {
-              "current": 699560960,
-              "peak": 3680867328
-            },
-            "reserved": {
-              "current": 713031680,
-              "peak": 3751804928
-            },
-            "inactive": {
-              "current": 13470720,
-              "peak": 650977280
-            },
-            "events": {
-              "retries": 0,
-              "oom": 0
+            "cuda": {
+                "system": {
+                    "free": 4281335808,
+                    "used": 2160787456,
+                    "total": 85899345920
+                },
+                "active": {
+                    "current": 699560960,
+                    "peak": 3680867328
+                },
+                "allocated": {
+                    "current": 699560960,
+                    "peak": 3680867328
+                },
+                "reserved": {
+                    "current": 713031680,
+                    "peak": 3751804928
+                },
+                "inactive": {
+                    "current": 13470720,
+                    "peak": 650977280
+                },
+                "events": {
+                    "retries": 0,
+                    "oom": 0
+                }
             }
-          }
         }
         return build_resp
 
@@ -470,11 +496,11 @@ class Backend:
                 )
                 response.raise_for_status()
             except httpx.RequestError as e:
-                error_info = {"error": "Request error", "details": traceback.format_exc()}
+                error_info = {"error": "Request error", "details": str(e)}
                 logger.warning(error_info)
                 return error_info
             except httpx.HTTPStatusError as e:
-                error_info = {"error": "HTTP error", "status_code": e.response.status_code, "details": traceback.format_exc()}
+                error_info = {"error": "HTTP error", "status_code": e.response.status_code, "details": str(e)}
                 logger.warning(error_info)
                 return error_info
             if format:
@@ -483,7 +509,6 @@ class Backend:
                 return response
 
     def repeat(self, input_):
-        # 使用列表推导式生成重复的tag列表
         repeated_ = [input_ for _ in range(self.total_img_count)]
         return repeated_
 
@@ -494,8 +519,6 @@ class Backend:
         pass
 
     async def get_backend_working_progress(self):
-
-        self.get_backend_id()
 
         avg_time = 0
         try:
@@ -540,8 +563,6 @@ class Backend:
         获取生图结果的函数
         :return: 类A1111 webui返回值
         """
-        if self.backend_id is None:
-            self.get_backend_id()
         total_retry = self.config.retry_times
 
         for retry_times in range(total_retry):
@@ -578,19 +599,20 @@ class Backend:
                             await self.posting()
 
                         else:
-                            for i in range(self.batch_count):
+                            for i in range(self.n_iter):
                                 await self.posting()
                                 self.seed += 1
                                 self.seed_list.append(self.seed)
 
                     else:
-                        self.logger.info(f"{self.backend_name}: {self.backend_id[:24]} total {self.total_img_count} images")
-                        for i in range(self.batch_count):
+                        self.logger.info(
+                            f"{self.backend_name}: {self.backend_id[:24]} total {self.total_img_count} images")
+                        for i in range(self.n_iter):
                             if i > 0:
                                 self.seed += 1
                                 self.seed_list.append(self.seed)
 
-                            await self.add_to_queue(self.backend_id[:24], self.posting)
+                            await self.add_to_queue(self.workload_name, self.posting)
 
                     if self.config.server_settings['enable_nsfw_check']:
                         await self.pic_audit()
@@ -605,7 +627,6 @@ class Backend:
                 #     await asyncio.sleep(30)
 
                 if retry_times == (total_retry - 1):
-
                     err = traceback.format_exc()
                     self.logger.error(f"{_('Over maximum retry times, posting still failed')}: {err}")
                     await self.return_build_image(text=f"Exception: {e}", title="FATAL")
@@ -615,12 +636,16 @@ class Backend:
             finally:
                 self.end_time = time.time()
                 self.spend_time = self.end_time - self.start_time
-                self.logger.info(_("Request completed, took %s seconds") % int(self.spend_time))
+                self.logger.info(_("Request completed, took {0} seconds").format(int(self.spend_time)))
                 await self.set_backend_working_status(params={"end_time": self.end_time, "idle": True})
 
         return self
 
     async def post_request(self):
+
+        if self.override_setting:
+            self.payload.update({key: value for key, value in self.__dict__.items() if key in self.payload})
+
         try:
             post_api = f"{self.backend_id}/sdapi/v1/txt2img"
             if self.init_images:
@@ -644,6 +669,7 @@ class Backend:
                         self.logger.info(_("VRAM OOM detected, auto model unload and reload"))
                         await self.unload_and_reload(self.backend_id)
                 else:
+                    self.post_event.set()
                     self.result = resp_dict
                     self.logger.info(_("Get a respond image, processing"))
             else:
@@ -654,14 +680,15 @@ class Backend:
             traceback.print_exc()
 
     async def posting(self):
-        
+
         """
         默认为a1111webui posting
         :return:
         """
+        self.post_event = asyncio.Event()
         await self.post_request()
 
-        # self.post_event = asyncio.Event()
+
         # post_task = asyncio.create_task(self.post_request())
         # # 此处为显示进度条
         # while not self.post_event.is_set():
@@ -700,7 +727,8 @@ class Backend:
 
     async def save_image(self, img_data, base_path="txt2img"):
 
-        self.save_path = Path(f'saved_images/{self.task_type}/{self.current_date}/{self.workload_name[:12]}')
+        self.save_path = Path(
+            f'saved_images/{self.task_type}/{self.current_date}/{self.backend_type}/{self.backend_name}')
         self.save_path.mkdir(parents=True, exist_ok=True)
 
         img_filename = self.save_path / Path(self.task_id).name
@@ -757,7 +785,7 @@ class Backend:
         在控制台实时打印后端工作进度进度条
         :return:
         """
-        show_str = f"[SD-A1111] [{self.time}] : {self.seed}"
+        show_str = f"{Fore.CYAN}{self.workload_name} : {self.seed}"
         show_str = show_str.ljust(25, "-")
         with tqdm(total=1, desc=show_str + "-->", bar_format="{l_bar}{bar}|{postfix}\n") as pbar:
             while not self.post_event.is_set():
@@ -779,10 +807,13 @@ class Backend:
                 headers=None
             )
 
+            if isinstance(response, dict):
+                return response.get("progress"), response.get("eta_relative")
+
             if isinstance(response, httpx.Response):
                 if response.status_code == 200:
-                    resp_json = response.json()
-                    return resp_json.get("progress"), resp_json.get("eta_relative")
+                    pass
+
                 else:
                     self.logger.error(f"获取进度失败，状态码: {response.status_code}")
                     raise RuntimeError(f"获取进度失败，状态码: {response.status_code}")
@@ -791,7 +822,7 @@ class Backend:
                 raise RuntimeError(f"请求失败，错误信息: {response.get('details')}")
         except:
             traceback.print_exc()
-            return 0.404
+            return 0.404, 10
 
     async def set_backend_working_status(
             self,
@@ -893,14 +924,17 @@ class Backend:
 
     async def pic_audit(self):
         from ..utils.tagger import wd_tagger_handler
+        self.logger.info(_("Starting image audit"))
         new_image_list = []
         for i in self.result['images']:
             is_nsfw = await wd_tagger_handler.tagger_main(i, 0.35, [], audit=True, ratings_=False)
 
             if is_nsfw:
+                self.logger.info(_("NSFW Detected"))
                 img_base64 = await self.return_build_image()
                 new_image_list.append(img_base64)
             else:
+                self.logger.info(_("Image safe"))
                 new_image_list.append(i)
 
         self.result['images'] = new_image_list
@@ -975,7 +1009,6 @@ class Backend:
         self.img.append(base64_image)
 
         return base64_image
-
 
     async def err_formating_to_sd_style(self):
 

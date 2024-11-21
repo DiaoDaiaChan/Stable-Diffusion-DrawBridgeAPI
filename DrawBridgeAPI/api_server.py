@@ -27,7 +27,10 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.exceptions import HTTPException
 from pathlib import Path
 
-from .locales import _
+logger = setup_logger("[API]")
+logging.getLogger("uvicorn.access").disabled = True
+logging.getLogger("uvicorn.error").disabled = True
+logging.getLogger("fastapi").disabled = True
 
 app = FastAPI()
 
@@ -38,24 +41,26 @@ parser.add_argument('--port', type=int, default=8000,
                     help='The port number to listen on (default: 8000).')
 parser.add_argument('--conf', '-c', type=str, default='./config.yaml',
                     help='配置文件路径', dest='conf')
+parser.add_argument('--working-dir', '-wd', type=str, default='./',
+                    help='工作路径', dest='working_dir')
+parser.add_argument('--fastapi-log', action="store_true", help='工作路径', dest='log')
 
 args = parser.parse_args()
 port = args.port
 host = args.host
 config_file_path = path_env or args.conf
 
+from .locales import _
+
 init_instance.init(config_file_path)
 config = init_instance.config
 redis_client = init_instance.redis_client
+os.chdir(args.working_dir)
+logger.info(_("Working directory: {0}").format(os.getcwd()))
 
 from .backend import TaskHandler, Backend, StaticHandler
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-
-logger = setup_logger("[API]")
-logging.getLogger("uvicorn.access").disabled = True
-logging.getLogger("uvicorn.error").disabled = True
-logging.getLogger("fastapi").disabled = True
 
 
 class Api:
@@ -192,7 +197,6 @@ class Api:
             raise HTTPException(500, detail='Result not found')
 
         return result
-
     @staticmethod
     async def img2img_api(request: request_model.Img2ImgRequest, api: Request):
         data = request.model_dump()
@@ -437,4 +441,4 @@ if __name__ == "__main__":
     #     demo = create_gradio_interface(host, port)
     #     app = gradio.mount_gradio_app(api_instance.app, demo, path="/")
 
-    uvicorn.run(api_instance.app, host=host, port=port)
+    uvicorn.run(api_instance.app, host=host, port=port, log_level="critical" if not args.log else "info")
