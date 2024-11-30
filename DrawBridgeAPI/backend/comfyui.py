@@ -309,7 +309,7 @@ class AIDRAW(Backend):
 
                 if isinstance(node_id, list):
                     node_id = node_id
-                elif isinstance(node_id, int or str):
+                elif isinstance(node_id, (int, str)):
                     node_id = [node_id]
                 elif isinstance(node_id, dict):
                     node_id = list(node_id.keys())

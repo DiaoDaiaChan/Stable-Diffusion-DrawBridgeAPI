@@ -129,7 +129,7 @@ class TaggerRequest(RequetModelClass):
 
 class TopazAiRequest(BaseModel):
     image: Optional[str] = None
-    input_folder: Optional[str or Path]
+    input_folder: Optional[str | Path]
     output_folder: Optional[str] = None
     overwrite: Optional[bool] = False
     recursive: Optional[bool] = False

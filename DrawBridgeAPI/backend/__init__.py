@@ -26,6 +26,7 @@ from DrawBridgeAPI.locales import _ as i18n
 class BaseHandler:
     #
     selected_instance_list: list[Backend] = []
+    selected_instance_dict : dict[list[Backend]] = {}
     init_parameters_list: list[dict] = []
     enable_backend: dict = {}
 
@@ -55,12 +56,12 @@ class BaseHandler:
         :return:
         """
 
-        if self.selected_instance_list:
+        if self.selected_instance_dict.get(task_type, None):
 
-            self.instance_list = self.selected_instance_list
+            self.instance_list = self.selected_instance_dict[task_type]
             return
 
-        enable_backend_list: dict[str, list[int]] = self.config.enable_backends.get(task_type, {})
+        enable_backend_list = self.config.enable_backends[task_type]
 
         for enable_backend, backend_setting in enable_backend_list.items():
 
@@ -169,6 +170,7 @@ class BaseHandler:
                 from .midjourney import AIDRAW
                 create_and_append_instances(enable_backend, AIDRAW, backend_setting)
 
+        self.selected_instance_dict[task_type] = self.selected_instance_list
         self.instance_list = self.selected_instance_list
 
 
@@ -204,7 +206,7 @@ class A1111WebuiHandlerAPI(BaseHandler):
 class ComfyUIHandler(BaseHandler):
 
     async def get_all_instance(self) -> tuple[list[Backend], dict, list]:
-        await self.get_enable_task("comfyui")
+        await self.get_enable_task("enable_comfyui_backends")
         return self.instance_list, self.enable_backend, self.init_parameters_list
 
 
@@ -636,7 +638,7 @@ class TaskHandler(StaticHandler):
         await self.choice_backend()
         return self.result
 
-    async def sd_api(self) -> JSONResponse or list[Backend]:
+    async def sd_api(self) -> JSONResponse | list[Backend]:
 
         self.instance_list, self.enable_backend, self.parameters_list = await A1111WebuiHandlerAPI(
             self.payload,
@@ -647,7 +649,7 @@ class TaskHandler(StaticHandler):
         await self.choice_backend()
         return self.result
 
-    async def comfyui_api(self) -> JSONResponse or list[Backend]:
+    async def comfyui_api(self) -> JSONResponse | list[Backend]:
 
         self.instance_list, self.enable_backend, self.parameters_list = await ComfyUIHandler(
             self.payload,
@@ -723,7 +725,7 @@ class TaskHandler(StaticHandler):
                             normal_backend = (list(status_dict.keys()))
                         else:
                             raise RuntimeError
-                    except RuntimeError or TypeError:
+                    except (RuntimeError, TypeError):
                         logger.warning(i18n('Backend {0} is failed or locked').format(self.instance_list[e].workload_name))
                         continue
                     else:

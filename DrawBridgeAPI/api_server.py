@@ -196,7 +196,8 @@ class Api:
         if result is None:
             raise HTTPException(500, detail='Result not found')
 
-        return result
+        return
+
     @staticmethod
     async def img2img_api(request: request_model.Img2ImgRequest, api: Request):
         data = request.model_dump()
@@ -226,7 +227,7 @@ class Api:
         path = '/sdapi/v1/sd-models'
 
         task_handler = TaskHandler({}, None, path, reutrn_instance=True, override_model_select=True)
-        instance_list: list[Backend] = await task_handler.txt2img()
+        instance_list: list[Backend] = await task_handler.sd_api()
 
         for i in instance_list:
             task_list.append(i.get_models())
@@ -382,7 +383,7 @@ class Api:
         path = '/sdapi/v1/prompt-styles'
 
         task_handler = TaskHandler({}, None, path, reutrn_instance=True, override_model_select=True)
-        instance_list: list[Backend] = await task_handler.txt2img()
+        instance_list: list[Backend] = await task_handler.sd_api()
 
         for i in instance_list:
             task_list.append(i.get_all_prompt_style())

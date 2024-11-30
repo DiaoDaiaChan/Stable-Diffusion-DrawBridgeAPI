@@ -829,7 +829,7 @@ class Backend:
             params: dict = None,
             get: bool = False,
             key: str = None,
-    ) -> bool or None:
+    ) -> bool | None:
         """
         设置或获取后端工作状态
 
