@@ -196,7 +196,7 @@ class Api:
         if result is None:
             raise HTTPException(500, detail='Result not found')
 
-        return
+        return result
 
     @staticmethod
     async def img2img_api(request: request_model.Img2ImgRequest, api: Request):

@@ -155,7 +155,7 @@ class AIDRAW(Backend):
             else:
                 available = True
 
-            if len(response["queue_running"]) == 0:
+            if len(response.get("queue_running", [])) == 0:
                 progress = 0
             else:
                 progress = 0.99

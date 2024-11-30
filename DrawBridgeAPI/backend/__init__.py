@@ -26,8 +26,9 @@ from DrawBridgeAPI.locales import _ as i18n
 class BaseHandler:
     #
     selected_instance_list: list[Backend] = []
-    selected_instance_dict : dict[list[Backend]] = {}
-    init_parameters_list: list[dict] = []
+    selected_instance_dict: dict[list[Backend]] = {}
+    init_parameters_list: list = []
+    init_parameters_dict: dict = {}
     enable_backend: dict = {}
 
     def __init__(
@@ -45,6 +46,7 @@ class BaseHandler:
         self.config = init_instance.config
         self.all_task_list = None
         self.comfyui_task: str = comfyui_task
+        self.task_type: str = "enable_txt2img_backends"
 
     async def get_enable_task(
         self,
@@ -55,6 +57,10 @@ class BaseHandler:
         :param enable_task:
         :return:
         """
+
+        self.init_parameters_list = []
+        self.selected_instance_list = []
+        update_dict = {}
 
         if self.selected_instance_dict.get(task_type, None):
 
@@ -109,12 +115,12 @@ class BaseHandler:
                     aidraw_instance = AIDRAW_class(
                         **init_args
                     )
-                    self.enable_backend.update(
-                        {
+                    update_dict.update({
                             self.config.backends[enable_backend_type]["name"][counter]:
                             self.config.backends[enable_backend_type]["api"][counter]
                         }
                     )
+
                     aidraw_instance.init_backend_info()
                     import_logger.info("Backend {0} is enabled".format(self.config.backends[enable_backend_type]['name'][counter]))
 
@@ -170,6 +176,8 @@ class BaseHandler:
                 from .midjourney import AIDRAW
                 create_and_append_instances(enable_backend, AIDRAW, backend_setting)
 
+        self.enable_backend[task_type] = update_dict
+        self.init_parameters_dict[task_type] = self.init_parameters_list
         self.selected_instance_dict[task_type] = self.selected_instance_list
         self.instance_list = self.selected_instance_list
 
@@ -179,10 +187,11 @@ class TXT2IMGHandler(BaseHandler):
     def __init__(self, payload, comfyui_task: str = None):
         super().__init__(comfyui_task=comfyui_task, payload=payload)
 
-    async def get_all_instance(self) -> tuple[list[Backend], dict, list]:
+    async def get_all_instance(self) -> tuple[list[Backend], dict, dict]:
 
-        await self.get_enable_task("enable_txt2img_backends")
-        return self.instance_list, self.enable_backend, self.init_parameters_list
+        self.task_type = "enable_txt2img_backends"
+        await self.get_enable_task(self.task_type)
+        return self.instance_list, self.enable_backend, self.init_parameters_dict
 
 
 class IMG2IMGHandler(BaseHandler):
@@ -190,24 +199,27 @@ class IMG2IMGHandler(BaseHandler):
     def __init__(self, payload, comfyui_task: str = None):
         super().__init__(comfyui_task=comfyui_task, payload=payload)
 
-    async def get_all_instance(self) -> tuple[list[Backend], dict, list]:
-
-        await self.get_enable_task("enable_img2img_backends")
-        return self.instance_list, self.enable_backend, self.init_parameters_list
+    async def get_all_instance(self) -> tuple[list[Backend], dict, dict]:
+        self.task_type = "enable_img2img_backends"
+        await self.get_enable_task(self.task_type)
+        return self.instance_list, self.enable_backend, self.init_parameters_dict
 
 
 class A1111WebuiHandlerAPI(BaseHandler):
-    async def get_all_instance(self) -> tuple[list[Backend], dict, list]:
+    async def get_all_instance(self) -> tuple[list[Backend], dict, dict]:
 
-        await self.get_enable_task("enable_sdapi_backends")
-        return self.instance_list, self.enable_backend, self.init_parameters_list
+        self.task_type = "enable_sdapi_backends"
+        await self.get_enable_task(self.task_type)
+        return self.instance_list, self.enable_backend, self.init_parameters_dict
 
 
 class ComfyUIHandler(BaseHandler):
 
-    async def get_all_instance(self) -> tuple[list[Backend], dict, list]:
-        await self.get_enable_task("enable_comfyui_backends")
-        return self.instance_list, self.enable_backend, self.init_parameters_list
+    async def get_all_instance(self) -> tuple[list[Backend], dict, dict]:
+
+        self.task_type = "enable_comfyui_backends"
+        await self.get_enable_task(self.task_type)
+        return self.instance_list, self.enable_backend, self.init_parameters_dict
 
 
 class StaticHandler:
@@ -584,11 +596,11 @@ class TaskHandler(StaticHandler):
     ):
         self.payload = payload
         self.instance_list = []
-        self.parameters_list = []
+        self.parameters_list = {}
         self.result = None
         self.request = request
         self.path = path
-        self.enable_backend = None
+        self.enable_backend: dict[str: dict] = None
         self.reutrn_instance = reutrn_instance
         self.select_backend = select_backend
         self.model_to_backend = model_to_backend  # 模型的名称
@@ -600,6 +612,8 @@ class TaskHandler(StaticHandler):
 
         self.ava_backend_url = None
         self.ava_backend_index = None
+
+        self.task_type: str = None
 
     @staticmethod
     def get_backend_name(model_name) -> str:
@@ -625,7 +639,7 @@ class TaskHandler(StaticHandler):
             comfyui_task=self.comfyui_json
         ).get_all_instance()
 
-        await self.choice_backend()
+        await self.choice_backend(task_type="enable_txt2img_backends")
         return self.result
 
     async def img2img(self):
@@ -635,7 +649,7 @@ class TaskHandler(StaticHandler):
             comfyui_task=self.comfyui_json
         ).get_all_instance()
 
-        await self.choice_backend()
+        await self.choice_backend(task_type="enable_img2img_backends")
         return self.result
 
     async def sd_api(self) -> JSONResponse | list[Backend]:
@@ -646,7 +660,7 @@ class TaskHandler(StaticHandler):
             self.path
         ).get_all_instance()
 
-        await self.choice_backend()
+        await self.choice_backend(task_type="enable_sdapi_backends")
         return self.result
 
     async def comfyui_api(self) -> JSONResponse | list[Backend]:
@@ -657,19 +671,22 @@ class TaskHandler(StaticHandler):
             self.path
         ).get_all_instance()
 
-        await self.choice_backend()
+        await self.choice_backend(task_type="enable_comfyui_backends")
         return self.result
 
-    async def choice_backend(self):
+    async def choice_backend(self, task_type: str):
+
+        self.task_type = task_type
 
         from DrawBridgeAPI.locales import _ as i18n
 
         if self.disable_loadbalance:
             return
-        backend_url_dict = self.enable_backend
+
+        backend_url_dict = self.enable_backend[task_type]
+
         self.set_backend_list(backend_url_dict)
         self.get_redis_client()
-        reverse_dict = {value: key for key, value in backend_url_dict.items()}
 
         tasks = []
         is_avaiable = 0
@@ -763,6 +780,7 @@ class TaskHandler(StaticHandler):
                 self.load_balance_logger.info(
                     i18n('Backend: {0} Average work time: {1} seconds, Current tasks: {2}').format(site, time_, image_count - 1)
                 )
+
                 if site in normal_backend:
                     self.update_backend_status()
                     for key in self.backend_status:
@@ -796,6 +814,7 @@ class TaskHandler(StaticHandler):
             fastest_backend = sorted_list[0]
             ava_url = rev_dict[fastest_backend]
             self.load_balance_logger.info(i18n('Backend: {0} is the fastest, has been selected').format(ava_url[:35]))
+
             ava_url_index = list(backend_url_dict.values()).index(ava_url)
 
             self.ava_backend_url = ava_url
@@ -805,17 +824,20 @@ class TaskHandler(StaticHandler):
             # ava_url_tuple = (ava_url, reverse_dict[ava_url], all_resp, len(normal_backend), vram_dict[ava_url])
 
     async def exec_generate(self):
-        self.set_backend_image(self.total_images, self.ava_backend_url)
         fifo = None
         try:
+            self.set_backend_image(self.total_images, self.ava_backend_url)
             select_instance = self.instance_list[self.ava_backend_index]
-            self.parameters_list[self.ava_backend_index]['payload'] = self.payload
-            select_instance.__init__(**self.parameters_list[self.ava_backend_index])
+
+            self.parameters_list[self.task_type][self.ava_backend_index]['payload'] = self.payload
+            select_instance.__init__(**self.parameters_list[self.task_type][self.ava_backend_index])
+
             select_instance.init_backend_info()
             fifo = await select_instance.send_result_to_api()
         except:
             traceback.print_exc()
         finally:
             self.set_backend_image(-self.total_images, self.ava_backend_url)
-            self.result = fifo.result if fifo is not None else None
             await self.set_backend_work_time(fifo.spend_time, self.ava_backend_url, fifo.total_img_count)
+            self.result = fifo.result
+

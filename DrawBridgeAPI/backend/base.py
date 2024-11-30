@@ -475,10 +475,14 @@ class Backend:
                     else:
                         return await response.read()
 
-        proxies = {
-            "http://": init_instance.config.server_settings['proxy'] if proxy else None,
-            "https://": init_instance.config.server_settings['proxy'] if proxy else None,
-        }
+        if init_instance.config.server_settings.get("proxy", None):
+            proxies = {
+                "http://": init_instance.config.server_settings['proxy'],
+                "https://": init_instance.config.server_settings['proxy'],
+            }
+
+        else:
+            proxies = None
 
         async with httpx.AsyncClient(
                 verify=verify,
@@ -631,7 +635,6 @@ class Backend:
                     self.logger.error(f"{_('Over maximum retry times, posting still failed')}: {err}")
                     await self.return_build_image(text=f"Exception: {e}", title="FATAL")
                     await self.err_formating_to_sd_style()
-                    return self
 
             finally:
                 self.end_time = time.time()
