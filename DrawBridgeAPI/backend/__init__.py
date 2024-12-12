@@ -26,6 +26,8 @@ from DrawBridgeAPI.locales import _ as i18n
 class BaseHandler:
     #
     selected_instance_list: list[Backend] = []
+    class_list: list[Backend] = []
+    class_dict: dict = {}
     selected_instance_dict: dict[list[Backend]] = {}
     init_parameters_list: list = []
     init_parameters_dict: dict = {}
@@ -60,6 +62,7 @@ class BaseHandler:
 
         self.init_parameters_list = []
         self.selected_instance_list = []
+        self.class_list = []
         update_dict = {}
 
         if self.selected_instance_dict.get(task_type, None):
@@ -125,6 +128,7 @@ class BaseHandler:
                     import_logger.info("Backend {0} is enabled".format(self.config.backends[enable_backend_type]['name'][counter]))
 
                     self.selected_instance_list.append(aidraw_instance)
+                    self.class_list.append(AIDRAW_class)
 
             if "civitai" in enable_backend:
                 from .SD_civitai_API import AIDRAW
@@ -180,6 +184,7 @@ class BaseHandler:
         self.init_parameters_dict[task_type] = self.init_parameters_list
         self.selected_instance_dict[task_type] = self.selected_instance_list
         self.instance_list = self.selected_instance_list
+        self.class_dict[task_type] = self.class_list
 
 
 class TXT2IMGHandler(BaseHandler):
@@ -187,11 +192,11 @@ class TXT2IMGHandler(BaseHandler):
     def __init__(self, payload, comfyui_task: str = None):
         super().__init__(comfyui_task=comfyui_task, payload=payload)
 
-    async def get_all_instance(self) -> tuple[list[Backend], dict, dict]:
+    async def get_all_instance(self) -> tuple[list[Backend], dict, dict, dict]:
 
         self.task_type = "enable_txt2img_backends"
         await self.get_enable_task(self.task_type)
-        return self.instance_list, self.enable_backend, self.init_parameters_dict
+        return self.instance_list, self.enable_backend, self.init_parameters_dict, self.class_dict
 
 
 class IMG2IMGHandler(BaseHandler):
@@ -199,27 +204,27 @@ class IMG2IMGHandler(BaseHandler):
     def __init__(self, payload, comfyui_task: str = None):
         super().__init__(comfyui_task=comfyui_task, payload=payload)
 
-    async def get_all_instance(self) -> tuple[list[Backend], dict, dict]:
+    async def get_all_instance(self) -> tuple[list[Backend], dict, dict, dict]:
         self.task_type = "enable_img2img_backends"
         await self.get_enable_task(self.task_type)
-        return self.instance_list, self.enable_backend, self.init_parameters_dict
+        return self.instance_list, self.enable_backend, self.init_parameters_dict, self.class_dict
 
 
 class A1111WebuiHandlerAPI(BaseHandler):
-    async def get_all_instance(self) -> tuple[list[Backend], dict, dict]:
+    async def get_all_instance(self) -> tuple[list[Backend], dict, dict, dict]:
 
         self.task_type = "enable_sdapi_backends"
         await self.get_enable_task(self.task_type)
-        return self.instance_list, self.enable_backend, self.init_parameters_dict
+        return self.instance_list, self.enable_backend, self.init_parameters_dict, self.class_dict
 
 
 class ComfyUIHandler(BaseHandler):
 
-    async def get_all_instance(self) -> tuple[list[Backend], dict, dict]:
+    async def get_all_instance(self) -> tuple[list[Backend], dict, dict, dict]:
 
         self.task_type = "enable_comfyui_backends"
         await self.get_enable_task(self.task_type)
-        return self.instance_list, self.enable_backend, self.init_parameters_dict
+        return self.instance_list, self.enable_backend, self.init_parameters_dict, self.class_dict
 
 
 class StaticHandler:
@@ -595,7 +600,8 @@ class TaskHandler(StaticHandler):
         override_model_select: bool = False,
     ):
         self.payload = payload
-        self.instance_list = []
+        self.instance_list: list[Backend] = []
+        self.class_dict: dict = {}
         self.parameters_list = {}
         self.result = None
         self.request = request
@@ -634,7 +640,7 @@ class TaskHandler(StaticHandler):
 
     async def txt2img(self):
 
-        self.instance_list, self.enable_backend, self.parameters_list = await TXT2IMGHandler(
+        self.instance_list, self.enable_backend, self.parameters_list, self.class_dict = await TXT2IMGHandler(
             self.payload,
             comfyui_task=self.comfyui_json
         ).get_all_instance()
@@ -644,7 +650,7 @@ class TaskHandler(StaticHandler):
 
     async def img2img(self):
 
-        self.instance_list, self.enable_backend, self.parameters_list = await IMG2IMGHandler(
+        self.instance_list, self.enable_backend, self.parameters_list, self.class_dict = await IMG2IMGHandler(
             self.payload,
             comfyui_task=self.comfyui_json
         ).get_all_instance()
@@ -654,7 +660,7 @@ class TaskHandler(StaticHandler):
 
     async def sd_api(self) -> JSONResponse | list[Backend]:
 
-        self.instance_list, self.enable_backend, self.parameters_list = await A1111WebuiHandlerAPI(
+        self.instance_list, self.enable_backend, self.parameters_list, self.class_dict = await A1111WebuiHandlerAPI(
             self.payload,
             self.request,
             self.path
@@ -665,7 +671,7 @@ class TaskHandler(StaticHandler):
 
     async def comfyui_api(self) -> JSONResponse | list[Backend]:
 
-        self.instance_list, self.enable_backend, self.parameters_list = await ComfyUIHandler(
+        self.instance_list, self.enable_backend, self.parameters_list, self.class_dict = await ComfyUIHandler(
             self.payload,
             self.request,
             self.path
@@ -827,10 +833,10 @@ class TaskHandler(StaticHandler):
         fifo = None
         try:
             self.set_backend_image(self.total_images, self.ava_backend_url)
-            select_instance = self.instance_list[self.ava_backend_index]
+            backend_class = self.class_dict[self.task_type][self.ava_backend_index]
 
             self.parameters_list[self.task_type][self.ava_backend_index]['payload'] = self.payload
-            select_instance.__init__(**self.parameters_list[self.task_type][self.ava_backend_index])
+            select_instance = backend_class(**self.parameters_list[self.task_type][self.ava_backend_index])
 
             select_instance.init_backend_info()
             fifo = await select_instance.send_result_to_api()

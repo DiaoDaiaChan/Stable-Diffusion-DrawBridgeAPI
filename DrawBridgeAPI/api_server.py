@@ -1,6 +1,5 @@
 import base64
 import os
-import httpx
 import asyncio
 import time
 import traceback
@@ -12,8 +11,6 @@ import logging
 import warnings
 import uuid
 import aiofiles
-import gradio
-import threading
 
 os.environ['CIVITAI_API_TOKEN'] = 'kunkun'
 os.environ['FAL_KEY'] = 'Daisuki'
